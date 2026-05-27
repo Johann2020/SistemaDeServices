@@ -639,15 +639,15 @@ h2 {
 }
 
 .status-card-revisado {
-  background: #eaf8ef;
+  background: #e9f6ed;
 }
 
 .status-card-revision-demorada {
-  background: #fff0cc;
+  background: #ffe7bc;
 }
 
 .status-card-retiro-demorado {
-  background: #efe8f7;
+  background: #dff0e6;
 }
 
 .status-card-entregado {
@@ -1548,15 +1548,15 @@ tbody tr.work-pending {
 }
 
 .filter-strip label:has(input[value="Revisado"]) {
-  background: #eaf8ef;
+  background: #e9f6ed;
 }
 
 .filter-strip label:has(input[value="Revision demorada"]) {
-  background: #fff0cc;
+  background: #ffe7bc;
 }
 
 .filter-strip label:has(input[value="Retiro demorado"]) {
-  background: #efe8f7;
+  background: #dff0e6;
 }
 
 .filter-strip label:has(input[value="Entregado"]) {
@@ -1645,11 +1645,11 @@ tbody tr.work-pending {
 }
 
 .status-revision-demorada {
-  background: #9a6a13;
+  background: #c88617;
 }
 
 .status-retiro-demorado {
-  background: #79569b;
+  background: #2d8a57;
 }
 
 .status-entregado {

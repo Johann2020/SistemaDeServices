@@ -1090,8 +1090,8 @@ function renderServices() {
       <td class="tooltip-cell" data-tooltip="${escapeHtml(partsSummary)}"><span class="cell-ellipsis">${escapeHtml(partsSummary || "---")}</span></td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(derivationSummary)}"><span class="cell-ellipsis">${escapeHtml(derivationSummary || "---")}</span></td>
       <td>${dateWithAgeHtml(service.entryDate)}</td>
-      <td>${dateWithAgeHtml(service.finishDate, { tooltip: serviceFinalizedTooltip(service) })}</td>
-      <td>${dateWithAgeHtml(service.deliveryDate, { tooltip: serviceDeliveredTooltip(service) })}</td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(serviceFinalizedTooltip(service))}">${dateWithAgeHtml(service.finishDate)}</td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(serviceDeliveredTooltip(service))}">${dateWithAgeHtml(service.deliveryDate)}</td>
       <td><strong>${money(service.total)}</strong></td>
     `;
     markSelectedRow("services", service.id, tr);
