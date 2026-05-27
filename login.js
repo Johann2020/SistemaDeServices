@@ -41,7 +41,7 @@ form.addEventListener("submit", async (event) => {
         password: passwordInput.value,
       }),
     });
-    const data = await response.json();
+    const data = await readResponseData(response);
     if (!response.ok) throw new Error(data.error || "No se pudo ingresar.");
     if (mode === "register" && data.pendingApproval) {
       setMode("login");
@@ -57,3 +57,16 @@ form.addEventListener("submit", async (event) => {
     submitButton.disabled = false;
   }
 });
+
+async function readResponseData(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text.trim() || "No se pudo completar la accion." };
+  }
+}

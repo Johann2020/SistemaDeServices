@@ -22,6 +22,7 @@ LOGIN_MAX_ATTEMPTS = 5
 LOGIN_WINDOW_SECONDS = 10 * 60
 LOGIN_LOCK_SECONDS = 10 * 60
 LOGIN_ATTEMPTS = {}
+BOOTSTRAP_FIRST_ADMIN = os.environ.get("BOOTSTRAP_FIRST_ADMIN", "").strip().lower() in {"1", "true", "yes"}
 CSRF_EXEMPT = {
     ("POST", "/api/login"),
     ("POST", "/api/register"),
@@ -274,11 +275,12 @@ class ServicesHandler(BaseHTTPRequestHandler):
         user_id = str(uuid.uuid4())
         with connect() as conn:
             existing_users = conn.execute("SELECT COUNT(*) AS total FROM users").fetchone()["total"]
-            approved = 1 if existing_users == 0 else 0
+            bootstrap_admin = existing_users == 0 and BOOTSTRAP_FIRST_ADMIN
+            approved = 1 if bootstrap_admin else 0
             try:
                 conn.execute(
                     "INSERT INTO users (id, name, email, password_hash, is_admin, approved) VALUES (?, ?, ?, ?, ?, ?)",
-                    (user_id, name, email, hash_password(password), 1 if existing_users == 0 else 0, approved),
+                    (user_id, name, email, hash_password(password), 1 if bootstrap_admin else 0, approved),
                 )
             except sqlite3.IntegrityError:
                 raise PublicError("Ya existe un usuario con ese email.")
@@ -290,7 +292,7 @@ class ServicesHandler(BaseHTTPRequestHandler):
                 )
 
         response = {
-            "user": {"id": user_id, "name": name, "email": email, "isAdmin": existing_users == 0, "approved": bool(approved)},
+            "user": {"id": user_id, "name": name, "email": email, "isAdmin": bool(approved and existing_users == 0), "approved": bool(approved)},
             "pendingApproval": not bool(approved),
         }
         headers = None
