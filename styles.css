@@ -1749,9 +1749,13 @@ tbody tr.work-pending {
 
 .delay-settings {
   display: grid;
-  grid-template-columns: minmax(150px, 1fr) 130px minmax(150px, 1fr) 130px 120px;
+  grid-template-columns: 1fr;
   gap: 12px;
   align-items: end;
+}
+
+.delay-settings button {
+  justify-self: start;
 }
 
 .work-entry label,
