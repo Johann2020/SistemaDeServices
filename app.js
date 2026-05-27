@@ -43,6 +43,8 @@ const state = {
     products: 1,
     services: 1,
   },
+  remotePages: {},
+  remotePageRequests: {},
 };
 
 const els = {
@@ -908,6 +910,7 @@ function persistSettings() {
 }
 
 function persistRemote(bucket, value) {
+  clearRemotePage(bucket);
   fetch(`/api/state/${bucket}`, {
     method: "PUT",
     credentials: "same-origin",
@@ -942,11 +945,23 @@ function resetTablePage(type) {
   if (state.pages[type]) state.pages[type] = 1;
 }
 
+function clearRemotePage(type) {
+  delete state.remotePages[type];
+}
+
+function clearRemotePages() {
+  state.remotePages = {};
+  state.remotePageRequests = {};
+}
+
 function mapById(items) {
   return new Map(items.map((item) => [Number(item.id), item]));
 }
 
 function paginateItems(type, items) {
+  const remotePage = getRemotePage(type);
+  if (remotePage) return remotePage;
+
   const totalPages = Math.max(1, Math.ceil(items.length / TABLE_PAGE_SIZE));
   const page = Math.min(Math.max(Number(state.pages[type] || 1), 1), totalPages);
   state.pages[type] = page;
@@ -960,6 +975,98 @@ function paginateItems(type, items) {
     end: Math.min(end, items.length),
     items: items.slice(start, end),
   };
+}
+
+function getRemotePage(type) {
+  const config = remotePageConfig(type);
+  if (!config) return null;
+  const cached = state.remotePages[type];
+  if (cached?.key === config.key) {
+    state.pages[type] = cached.page;
+    const start = (cached.page - 1) * cached.pageSize;
+    return {
+      page: cached.page,
+      totalPages: cached.pages,
+      total: cached.total,
+      start,
+      end: Math.min(start + cached.items.length, cached.total),
+      items: cached.items,
+    };
+  }
+  requestRemotePage(type, config);
+  return null;
+}
+
+function remotePageConfig(type) {
+  if (!state.remoteEnabled) return null;
+  const page = Math.max(Number(state.pages[type] || 1), 1);
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(TABLE_PAGE_SIZE),
+  });
+  const q = remoteSearchValue(type);
+  if (q) params.set("q", q);
+
+  if (type === "services") {
+    if (state.serviceHistoryFilter?.type === "client") {
+      params.set("clientId", String(state.serviceHistoryFilter.id));
+    }
+    if (state.serviceHistoryFilter?.type === "equipment") {
+      params.set("equipmentId", String(state.serviceHistoryFilter.id));
+    }
+    const statuses = serviceSelectedStatuses();
+    if (statuses.length === 1) {
+      params.set("status", statuses[0]);
+    } else if (statuses.length > 1) {
+      return null;
+    }
+  }
+
+  const query = params.toString();
+  return {
+    bucket: type,
+    key: query,
+    url: `/api/items/${type}?${query}`,
+  };
+}
+
+function remoteSearchValue(type) {
+  if (type === "clients") return els.search?.value.trim() || "";
+  if (type === "equipment") return els.equipmentSearch?.value.trim() || "";
+  if (type === "products") return els.productSearch?.value.trim() || "";
+  if (type === "services") return els.serviceSearch?.value.trim() || "";
+  return "";
+}
+
+function serviceSelectedStatuses() {
+  if (state.settings.serviceFilters?.all) return [];
+  return Array.isArray(state.settings.serviceFilters?.statuses)
+    ? state.settings.serviceFilters.statuses
+    : [];
+}
+
+async function requestRemotePage(type, config) {
+  if (state.remotePageRequests[type] === config.key) return;
+  state.remotePageRequests[type] = config.key;
+  try {
+    const page = await fetchJson(config.url);
+    if (state.remotePageRequests[type] !== config.key) return;
+    state.remotePages[type] = {
+      key: config.key,
+      items: Array.isArray(page.items) ? page.items : [],
+      page: Number(page.page || 1),
+      pageSize: Number(page.pageSize || TABLE_PAGE_SIZE),
+      total: Number(page.total || 0),
+      pages: Number(page.pages || 1),
+    };
+    renderPagedTable(type);
+  } catch {
+    clearRemotePage(type);
+  } finally {
+    if (state.remotePageRequests[type] === config.key) {
+      delete state.remotePageRequests[type];
+    }
+  }
 }
 
 function renderPagination(type, pageData) {

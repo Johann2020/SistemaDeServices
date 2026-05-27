@@ -1,6 +1,7 @@
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from http import cookies
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 import hashlib
 import hmac
 import json
@@ -27,6 +28,7 @@ CSRF_EXEMPT = {
     ("POST", "/api/login"),
     ("POST", "/api/register"),
 }
+ITEM_BUCKETS = {"clients", "equipment", "products", "services"}
 
 
 def connect():
@@ -65,6 +67,19 @@ def init_db():
               updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
               PRIMARY KEY (user_id, bucket)
             );
+
+            CREATE TABLE IF NOT EXISTS tenant_items (
+              user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              bucket TEXT NOT NULL,
+              item_id INTEGER NOT NULL,
+              data TEXT NOT NULL,
+              search_text TEXT NOT NULL DEFAULT '',
+              updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+              PRIMARY KEY (user_id, bucket, item_id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_tenant_items_bucket_search
+            ON tenant_items (user_id, bucket, search_text);
             """
         )
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
@@ -88,6 +103,7 @@ def init_db():
                 )
                 """
             )
+        migrate_tenant_items(conn)
 
 
 def default_settings():
@@ -107,6 +123,80 @@ def default_state():
         "services": [],
         "settings": default_settings(),
     }
+
+
+def item_search_text(value):
+    parts = []
+
+    def collect(item):
+        if item is None:
+            return
+        if isinstance(item, dict):
+            for child in item.values():
+                collect(child)
+            return
+        if isinstance(item, list):
+            for child in item:
+                collect(child)
+            return
+        parts.append(str(item))
+
+    collect(value)
+    return " ".join(parts).lower()
+
+
+def item_id(value):
+    try:
+        return int(value.get("id"))
+    except (AttributeError, TypeError, ValueError):
+        return 0
+
+
+def sync_bucket_items(conn, user_id, bucket, value):
+    if bucket not in ITEM_BUCKETS or not isinstance(value, list):
+        return
+    conn.execute("DELETE FROM tenant_items WHERE user_id = ? AND bucket = ?", (user_id, bucket))
+    rows = []
+    for index, item in enumerate(value, start=1):
+        if not isinstance(item, dict):
+            continue
+        row_id = item_id(item) or index
+        rows.append((
+            user_id,
+            bucket,
+            row_id,
+            json.dumps(item, ensure_ascii=False),
+            item_search_text(item),
+        ))
+    conn.executemany(
+        """
+        INSERT OR REPLACE INTO tenant_items (user_id, bucket, item_id, data, search_text, updated_at)
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """,
+        rows,
+    )
+
+
+def migrate_tenant_items(conn):
+    rows = conn.execute(
+        """
+        SELECT user_id, bucket, data
+        FROM tenant_data
+        WHERE bucket IN ('clients', 'equipment', 'products', 'services')
+        """
+    ).fetchall()
+    for row in rows:
+        existing = conn.execute(
+            "SELECT COUNT(*) AS total FROM tenant_items WHERE user_id = ? AND bucket = ?",
+            (row["user_id"], row["bucket"]),
+        ).fetchone()["total"]
+        if existing:
+            continue
+        try:
+            value = json.loads(row["data"])
+        except json.JSONDecodeError:
+            continue
+        sync_bucket_items(conn, row["user_id"], row["bucket"], value)
 
 
 def hash_password(password):
@@ -142,15 +232,33 @@ def public_user(row):
 def read_tenant_state(user_id):
     state = default_state()
     with connect() as conn:
-        rows = conn.execute(
+        data_rows = conn.execute(
             "SELECT bucket, data FROM tenant_data WHERE user_id = ?",
             (user_id,),
         ).fetchall()
-    for row in rows:
+        item_rows = conn.execute(
+            """
+            SELECT bucket, data
+            FROM tenant_items
+            WHERE user_id = ?
+            ORDER BY bucket, item_id
+            """,
+            (user_id,),
+        ).fetchall()
+    for row in data_rows:
         try:
             state[row["bucket"]] = json.loads(row["data"])
         except json.JSONDecodeError:
             pass
+    item_state = {bucket: [] for bucket in ITEM_BUCKETS}
+    for row in item_rows:
+        try:
+            item_state[row["bucket"]].append(json.loads(row["data"]))
+        except json.JSONDecodeError:
+            pass
+    for bucket, value in item_state.items():
+        if value:
+            state[bucket] = value
     return state
 
 
@@ -165,6 +273,106 @@ def write_bucket(user_id, bucket, value):
             """,
             (user_id, bucket, json.dumps(value, ensure_ascii=False)),
         )
+        sync_bucket_items(conn, user_id, bucket, value)
+
+
+def read_items_page(user_id, bucket, params):
+    if bucket not in ITEM_BUCKETS:
+        raise PublicError("Dato no valido.")
+    try:
+        page = max(1, int(params.get("page", ["1"])[0]))
+    except (TypeError, ValueError):
+        page = 1
+    try:
+        page_size = int(params.get("pageSize", ["50"])[0])
+    except (TypeError, ValueError):
+        page_size = 50
+    page_size = max(1, min(page_size, 200))
+    query = str(params.get("q", [""])[0]).strip().lower()
+    where = ["user_id = ?", "bucket = ?"]
+    values = [user_id, bucket]
+    if query:
+        where.append("search_text LIKE ?")
+        values.append(f"%{query}%")
+
+    if bucket == "services":
+        status = str(params.get("status", [""])[0]).strip()
+        client_id = str(params.get("clientId", [""])[0]).strip()
+        equipment_id = str(params.get("equipmentId", [""])[0]).strip()
+        if status:
+            where.append("json_extract(data, '$.status') = ?")
+            values.append(status)
+        if client_id:
+            where.append("CAST(json_extract(data, '$.clientId') AS TEXT) = ?")
+            values.append(client_id)
+        if equipment_id:
+            where.append("CAST(json_extract(data, '$.equipmentId') AS TEXT) = ?")
+            values.append(equipment_id)
+
+    where_sql = " AND ".join(where)
+    offset = (page - 1) * page_size
+    order_sql = "item_id ASC"
+    if bucket == "services":
+        order_sql = """
+        CASE json_extract(data, '$.status')
+          WHEN 'Sin revisar' THEN 1
+          WHEN 'Revision demorada' THEN 2
+          WHEN 'Revisado' THEN 3
+          WHEN 'Retiro demorado' THEN 4
+          WHEN 'Entregado' THEN 5
+          WHEN 'Cancelado' THEN 6
+          ELSE 99
+        END ASC,
+        item_id DESC
+        """
+
+    with connect() as conn:
+        total = conn.execute(
+            f"SELECT COUNT(*) AS total FROM tenant_items WHERE {where_sql}",
+            values,
+        ).fetchone()["total"]
+        rows = conn.execute(
+            f"""
+            SELECT data
+            FROM tenant_items
+            WHERE {where_sql}
+            ORDER BY {order_sql}
+            LIMIT ? OFFSET ?
+            """,
+            [*values, page_size, offset],
+        ).fetchall()
+
+    items = []
+    for row in rows:
+        try:
+            items.append(json.loads(row["data"]))
+        except json.JSONDecodeError:
+            pass
+    pages = max(1, (total + page_size - 1) // page_size)
+    return {
+        "items": items,
+        "page": min(page, pages),
+        "pageSize": page_size,
+        "total": total,
+        "pages": pages,
+    }
+
+
+def tenant_item_counts(user_id):
+    counts = {bucket: 0 for bucket in ITEM_BUCKETS}
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT bucket, COUNT(*) AS total
+            FROM tenant_items
+            WHERE user_id = ?
+            GROUP BY bucket
+            """,
+            (user_id,),
+        ).fetchall()
+    for row in rows:
+        counts[row["bucket"]] = row["total"]
+    return counts
 
 
 def is_render_environment():
@@ -188,7 +396,9 @@ class ServicesHandler(BaseHTTPRequestHandler):
 
     def handle_api(self):
         try:
-            path = self.path.split("?", 1)[0]
+            parsed_url = urlparse(self.path)
+            path = parsed_url.path
+            params = parse_qs(parsed_url.query)
 
             if self.command in {"POST", "PUT"} and (self.command, path) not in CSRF_EXEMPT:
                 if not self.valid_csrf_token():
@@ -246,6 +456,11 @@ class ServicesHandler(BaseHTTPRequestHandler):
 
             if self.command == "GET" and path == "/api/state":
                 self.send_json(200, read_tenant_state(user["id"]))
+                return
+
+            if self.command == "GET" and path.startswith("/api/items/"):
+                bucket = path.rsplit("/", 1)[-1]
+                self.send_json(200, read_items_page(user["id"], bucket, params))
                 return
 
             if self.command == "PUT" and path.startswith("/api/state/"):
@@ -361,7 +576,7 @@ class ServicesHandler(BaseHTTPRequestHandler):
 
         users = []
         for row in rows:
-            state = read_tenant_state(row["id"])
+            counts = tenant_item_counts(row["id"])
             users.append({
                 "id": row["id"],
                 "name": row["name"],
@@ -369,12 +584,7 @@ class ServicesHandler(BaseHTTPRequestHandler):
                 "isAdmin": bool(row["is_admin"]),
                 "approved": bool(row["approved"]),
                 "createdAt": row["created_at"],
-                "counts": {
-                    "clients": len(state.get("clients", [])),
-                    "equipment": len(state.get("equipment", [])),
-                    "products": len(state.get("products", [])),
-                    "services": len(state.get("services", [])),
-                },
+                "counts": counts,
             })
         self.send_json(200, {
             "users": users,
