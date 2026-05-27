@@ -629,6 +629,47 @@ h2 {
   text-align: left;
 }
 
+.pagination-bar {
+  position: sticky;
+  left: 0;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 12px;
+  border-top: 1px solid #edf1f4;
+  background: #ffffff;
+  color: #526174;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pagination-bar.hidden {
+  display: none;
+}
+
+.pagination-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-actions button {
+  min-height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #f2f7fa;
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.pagination-actions button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .status-card:hover {
   filter: brightness(0.98);
   border-color: #cfd8e3;
@@ -1541,6 +1582,12 @@ tbody tr.work-pending {
   color: #415065;
   font-weight: 600;
   font-size: 13px;
+}
+
+.filter-strip-count {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.82;
 }
 
 .filter-strip label:has(input[value="Sin revisar"]) {

@@ -4,6 +4,7 @@ const PRODUCTS_STORAGE_KEY = "services_web_products_v1";
 const SERVICES_STORAGE_KEY = "services_web_services_v1";
 const SETTINGS_STORAGE_KEY = "services_web_settings_v1";
 const PATTERN_SIZE = 230;
+const TABLE_PAGE_SIZE = 50;
 const SERVICE_DELAY_STATUSES = {
   review: "Revision demorada",
   pickup: "Retiro demorado",
@@ -36,6 +37,12 @@ const state = {
   provinces: [],
   cities: [],
   offlineGeo: false,
+  pages: {
+    clients: 1,
+    equipment: 1,
+    products: 1,
+    services: 1,
+  },
 };
 
 const els = {
@@ -73,6 +80,12 @@ const els = {
   emptyEquipment: document.querySelector("#empty-equipment"),
   emptyProducts: document.querySelector("#empty-products"),
   emptyServices: document.querySelector("#empty-services"),
+  pagination: {
+    clients: document.querySelector("#clients-pagination"),
+    equipment: document.querySelector("#equipment-pagination"),
+    products: document.querySelector("#products-pagination"),
+    services: document.querySelector("#services-pagination"),
+  },
   metricClients: document.querySelector("#metric-clients"),
   metricEquipment: document.querySelector("#metric-equipment"),
   metricOpenServices: document.querySelector("#metric-open-services"),
@@ -379,10 +392,22 @@ function wireEvents() {
   });
 
   els.quickAction.addEventListener("click", handleQuickAction);
-  els.search.addEventListener("input", renderClients);
-  els.equipmentSearch.addEventListener("input", renderEquipment);
-  els.productSearch.addEventListener("input", renderProducts);
-  els.serviceSearch.addEventListener("input", renderServices);
+  els.search.addEventListener("input", () => {
+    resetTablePage("clients");
+    renderClients();
+  });
+  els.equipmentSearch.addEventListener("input", () => {
+    resetTablePage("equipment");
+    renderEquipment();
+  });
+  els.productSearch.addEventListener("input", () => {
+    resetTablePage("products");
+    renderProducts();
+  });
+  els.serviceSearch.addEventListener("input", () => {
+    resetTablePage("services");
+    renderServices();
+  });
   els.clearServiceHistoryFilter.addEventListener("click", clearServiceHistoryFilter);
   els.filterAll.addEventListener("change", handleFilterAll);
   els.serviceFilters.forEach((filter) => filter.addEventListener("change", handleFilterOne));
@@ -913,6 +938,65 @@ function renderAll() {
   decorateActionButtons();
 }
 
+function resetTablePage(type) {
+  if (state.pages[type]) state.pages[type] = 1;
+}
+
+function mapById(items) {
+  return new Map(items.map((item) => [Number(item.id), item]));
+}
+
+function paginateItems(type, items) {
+  const totalPages = Math.max(1, Math.ceil(items.length / TABLE_PAGE_SIZE));
+  const page = Math.min(Math.max(Number(state.pages[type] || 1), 1), totalPages);
+  state.pages[type] = page;
+  const start = (page - 1) * TABLE_PAGE_SIZE;
+  const end = start + TABLE_PAGE_SIZE;
+  return {
+    page,
+    totalPages,
+    total: items.length,
+    start,
+    end: Math.min(end, items.length),
+    items: items.slice(start, end),
+  };
+}
+
+function renderPagination(type, pageData) {
+  const container = els.pagination[type];
+  if (!container) return;
+
+  if (pageData.total <= TABLE_PAGE_SIZE) {
+    container.classList.add("hidden");
+    container.innerHTML = "";
+    return;
+  }
+
+  container.classList.remove("hidden");
+  container.innerHTML = `
+    <span>${pageData.start + 1}-${pageData.end} de ${pageData.total}</span>
+    <div class="pagination-actions">
+      <button type="button" data-page-direction="-1" ${pageData.page <= 1 ? "disabled" : ""}>Anterior</button>
+      <strong>Pagina ${pageData.page} de ${pageData.totalPages}</strong>
+      <button type="button" data-page-direction="1" ${pageData.page >= pageData.totalPages ? "disabled" : ""}>Siguiente</button>
+    </div>
+  `;
+
+  container.querySelectorAll("[data-page-direction]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.pages[type] += Number(button.dataset.pageDirection);
+      renderPagedTable(type);
+    });
+  });
+}
+
+function renderPagedTable(type) {
+  if (type === "clients") renderClients();
+  else if (type === "equipment") renderEquipment();
+  else if (type === "products") renderProducts();
+  else if (type === "services") renderServices();
+}
+
 function renderAdminAccess() {
   els.adminPanelButton?.classList.toggle("hidden", !state.currentUser?.isAdmin && !state.adminUser?.isAdmin);
   els.impersonationBanner?.classList.toggle("hidden", !state.impersonating);
@@ -1022,12 +1106,13 @@ function renderMetrics() {
 
 function renderActivity() {
   els.activity.innerHTML = "";
+  const clientsById = mapById(state.clients);
   const clientActivity = state.clients.map((client) => ({
     date: client.createdAt,
     text: `Cliente registrado: ${client.name}`,
   }));
   const serviceActivity = state.services.map((service) => {
-    const client = getClientById(service.clientId);
+    const client = clientsById.get(Number(service.clientId));
     return {
       date: service.entryDate,
       text: `Servicio #${service.id}: ${client?.name || "Sin cliente"} - ${service.status}`,
@@ -1054,12 +1139,14 @@ function renderActivity() {
 function renderServices() {
   const query = normalizeSearch(els.serviceSearch.value);
   const allowedStatuses = getAllowedServiceStatuses();
+  const clientsById = mapById(state.clients);
+  const equipmentById = mapById(state.equipment);
   const filtered = state.services.filter((service) => {
     if (allowedStatuses.length > 0 && !allowedStatuses.includes(service.status)) return false;
     if (state.serviceHistoryFilter?.type === "client" && service.clientId !== state.serviceHistoryFilter.id) return false;
     if (state.serviceHistoryFilter?.type === "equipment" && service.equipmentId !== state.serviceHistoryFilter.id) return false;
-    const client = getClientById(service.clientId);
-    const equipment = getEquipmentById(service.equipmentId);
+    const client = clientsById.get(Number(service.clientId));
+    const equipment = equipmentById.get(Number(service.equipmentId));
     const partsSummary = servicePartsSummary(service);
     const derivationSummary = serviceDerivationSummary(service);
     const text = normalizeSearch(
@@ -1077,11 +1164,12 @@ function renderServices() {
     );
     return text.includes(query);
   }).sort(compareServicesByStatus);
+  const pageData = paginateItems("services", filtered);
 
   els.servicesBody.innerHTML = "";
-  filtered.forEach((service) => {
-    const client = getClientById(service.clientId);
-    const equipment = getEquipmentById(service.equipmentId);
+  pageData.items.forEach((service) => {
+    const client = clientsById.get(Number(service.clientId));
+    const equipment = equipmentById.get(Number(service.equipmentId));
     const failure = service.failure || "---";
     const partsSummary = servicePartsSummary(service);
     const derivationSummary = serviceDerivationSummary(service);
@@ -1122,6 +1210,7 @@ function renderServices() {
   });
 
   els.emptyServices.classList.toggle("visible", filtered.length === 0);
+  renderPagination("services", pageData);
 }
 
 function renderServiceFilterControls() {
@@ -1167,6 +1256,7 @@ function renderServiceHistoryFilter() {
 
 function clearServiceHistoryFilter() {
   state.serviceHistoryFilter = null;
+  resetTablePage("services");
   closeActionMenu();
   renderAll();
 }
@@ -1419,6 +1509,7 @@ function serviceAgeDays(dateValue) {
 function applyServiceHistoryFilter(type, id) {
   state.serviceHistoryFilter = { type, id };
   state.settings.serviceFilters = { all: true, statuses: [] };
+  resetTablePage("services");
   closeActionMenu();
   persistSettings();
   renderAll();
@@ -1436,6 +1527,7 @@ function handleFilterAll() {
   }
 
   persistSettings();
+  resetTablePage("services");
   renderAll();
 }
 
@@ -1446,11 +1538,13 @@ function handleFilterOne() {
     : { all: true, statuses: [] };
 
   persistSettings();
+  resetTablePage("services");
   renderAll();
 }
 
 function applyServiceStatusFilter(status) {
   state.settings.serviceFilters = { all: false, statuses: [status] };
+  resetTablePage("services");
   persistSettings();
   renderAll();
   showView("services");
@@ -1648,8 +1742,9 @@ function addFrequentWork() {
 
 function renderEquipment() {
   const query = normalizeSearch(els.equipmentSearch.value);
+  const clientsById = mapById(state.clients);
   const filtered = state.equipment.filter((equipment) => {
-    const client = getClientById(equipment.clientId);
+    const client = clientsById.get(Number(equipment.clientId));
     const text = normalizeSearch(
       [
         equipment.id,
@@ -1665,10 +1760,11 @@ function renderEquipment() {
     );
     return text.includes(query);
   });
+  const pageData = paginateItems("equipment", filtered);
 
   els.equipmentBody.innerHTML = "";
-  filtered.forEach((equipment) => {
-    const client = getClientById(equipment.clientId);
+  pageData.items.forEach((equipment) => {
+    const client = clientsById.get(Number(equipment.clientId));
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(equipment.id)}</td>
@@ -1693,6 +1789,7 @@ function renderEquipment() {
   });
 
   els.emptyEquipment.classList.toggle("visible", filtered.length === 0);
+  renderPagination("equipment", pageData);
 }
 
 function renderProducts() {
@@ -1703,9 +1800,10 @@ function renderProducts() {
     );
     return text.includes(query);
   });
+  const pageData = paginateItems("products", filtered);
 
   els.productsBody.innerHTML = "";
-  filtered.forEach((product) => {
+  pageData.items.forEach((product) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(product.id)}</td>
@@ -1730,6 +1828,7 @@ function renderProducts() {
   });
 
   els.emptyProducts.classList.toggle("visible", filtered.length === 0);
+  renderPagination("products", pageData);
 }
 
 function openProductDialog(id = null, seed = {}) {
@@ -2071,9 +2170,10 @@ function renderClients() {
     );
     return text.includes(query);
   });
+  const pageData = paginateItems("clients", filtered);
 
   els.tbody.innerHTML = "";
-  filtered.forEach((client) => {
+  pageData.items.forEach((client) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(client.id)}</td>
@@ -2098,6 +2198,7 @@ function renderClients() {
   });
 
   els.empty.classList.toggle("visible", filtered.length === 0);
+  renderPagination("clients", pageData);
 }
 
 function openClientDialog(id = null) {
@@ -3853,29 +3954,6 @@ function money(value) {
 function formatDate(value) {
   if (!value) return "---";
   return new Intl.DateTimeFormat("es-AR").format(new Date(value));
-}
-
-function dateWithAgeHtml(value) {
-  if (!value) return "---";
-  return `
-    <span class="date-age">
-      <strong>${escapeHtml(formatDate(value))}</strong>
-      <span>${escapeHtml(elapsedFrom(value))}</span>
-    </span>
-  `;
-}
-
-function elapsedFrom(value) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const diff = Math.max(0, Date.now() - date.getTime());
-  const days = Math.floor(diff / 86400000);
-  if (days < 1) return "Hoy";
-  if (days < 30) return `${days} dia${days === 1 ? "" : "s"}`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months} mes${months === 1 ? "" : "es"}`;
-  const years = Math.floor(months / 12);
-  return `${years} año${years === 1 ? "" : "s"}`;
 }
 
 function formatDateTime(value) {
