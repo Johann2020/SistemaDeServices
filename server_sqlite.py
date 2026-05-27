@@ -9,6 +9,7 @@ import os
 import secrets
 import sqlite3
 import sys
+import time
 import uuid
 
 
@@ -16,6 +17,15 @@ ROOT = Path(__file__).resolve().parent
 DATA_DIR = ROOT / "data"
 DB_PATH = DATA_DIR / "services.db"
 PORT = int(os.environ.get("PORT", "3000"))
+PASSWORD_ITERATIONS = 310_000
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_SECONDS = 10 * 60
+LOGIN_LOCK_SECONDS = 10 * 60
+LOGIN_ATTEMPTS = {}
+CSRF_EXEMPT = {
+    ("POST", "/api/login"),
+    ("POST", "/api/register"),
+}
 
 
 def connect():
@@ -36,12 +46,14 @@ def init_db():
               email TEXT NOT NULL UNIQUE,
               password_hash TEXT NOT NULL,
               is_admin INTEGER NOT NULL DEFAULT 0,
+              approved INTEGER NOT NULL DEFAULT 0,
               created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS sessions (
               token TEXT PRIMARY KEY,
               user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              csrf_token TEXT,
               created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -57,6 +69,12 @@ def init_db():
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
         if "is_admin" not in columns:
             conn.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER NOT NULL DEFAULT 0")
+        if "approved" not in columns:
+            conn.execute("ALTER TABLE users ADD COLUMN approved INTEGER NOT NULL DEFAULT 0")
+        session_columns = {row["name"] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()}
+        if "csrf_token" not in session_columns:
+            conn.execute("ALTER TABLE sessions ADD COLUMN csrf_token TEXT")
+        conn.execute("UPDATE users SET approved = 1 WHERE is_admin = 1")
         admin_count = conn.execute("SELECT COUNT(*) AS total FROM users WHERE is_admin = 1").fetchone()["total"]
         user_count = conn.execute("SELECT COUNT(*) AS total FROM users").fetchone()["total"]
         if user_count and not admin_count:
@@ -92,15 +110,18 @@ def default_state():
 
 def hash_password(password):
     salt = secrets.token_hex(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), PASSWORD_ITERATIONS)
     return f"{salt}:{digest.hex()}"
 
 
 def verify_password(password, stored):
     try:
         salt, expected = stored.split(":", 1)
-        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), 120_000).hex()
-        return hmac.compare_digest(digest, expected)
+        for iterations in (PASSWORD_ITERATIONS, 120_000):
+            digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations).hex()
+            if hmac.compare_digest(digest, expected):
+                return True
+        return False
     except ValueError:
         return False
 
@@ -113,6 +134,7 @@ def public_user(row):
         "name": row["name"],
         "email": row["email"],
         "isAdmin": bool(row["is_admin"]),
+        "approved": bool(row["approved"]),
     }
 
 
@@ -144,6 +166,10 @@ def write_bucket(user_id, bucket, value):
         )
 
 
+def is_render_environment():
+    return any(key.startswith("RENDER") for key in os.environ)
+
+
 class ServicesHandler(BaseHTTPRequestHandler):
     server_version = "ServicesSQLite/1.0"
 
@@ -163,6 +189,11 @@ class ServicesHandler(BaseHTTPRequestHandler):
         try:
             path = self.path.split("?", 1)[0]
 
+            if self.command in {"POST", "PUT"} and (self.command, path) not in CSRF_EXEMPT:
+                if not self.valid_csrf_token():
+                    self.send_json(403, {"error": "La sesion no pudo validarse. Recargue la pagina e intente nuevamente."})
+                    return
+
             if self.command == "GET" and path == "/api/me":
                 user = self.current_user()
                 admin = self.admin_user()
@@ -171,6 +202,7 @@ class ServicesHandler(BaseHTTPRequestHandler):
                     "user": public_user(user),
                     "admin": public_user(admin),
                     "impersonating": bool(user and admin and user["id"] != admin["id"]),
+                    "csrfToken": self.csrf_token_for_session(self.session_token("services_session")) if user else "",
                 })
                 return
 
@@ -200,6 +232,10 @@ class ServicesHandler(BaseHTTPRequestHandler):
 
             if self.command == "POST" and path == "/api/admin/delete-user":
                 self.admin_delete_user()
+                return
+
+            if self.command == "POST" and path == "/api/admin/approve-user":
+                self.admin_approve_user()
                 return
 
             user = self.current_user()
@@ -238,10 +274,11 @@ class ServicesHandler(BaseHTTPRequestHandler):
         user_id = str(uuid.uuid4())
         with connect() as conn:
             existing_users = conn.execute("SELECT COUNT(*) AS total FROM users").fetchone()["total"]
+            approved = 1 if existing_users == 0 else 0
             try:
                 conn.execute(
-                    "INSERT INTO users (id, name, email, password_hash, is_admin) VALUES (?, ?, ?, ?, ?)",
-                    (user_id, name, email, hash_password(password), 1 if existing_users == 0 else 0),
+                    "INSERT INTO users (id, name, email, password_hash, is_admin, approved) VALUES (?, ?, ?, ?, ?, ?)",
+                    (user_id, name, email, hash_password(password), 1 if existing_users == 0 else 0, approved),
                 )
             except sqlite3.IntegrityError:
                 raise PublicError("Ya existe un usuario con ese email.")
@@ -252,24 +289,39 @@ class ServicesHandler(BaseHTTPRequestHandler):
                     (user_id, bucket, json.dumps(value, ensure_ascii=False)),
                 )
 
-        token = self.create_session(user_id)
-        self.send_json(
-            201,
-            {"user": {"id": user_id, "name": name, "email": email, "isAdmin": existing_users == 0}},
-            {"Set-Cookie": self.cookie_header("services_session", token)},
-        )
+        response = {
+            "user": {"id": user_id, "name": name, "email": email, "isAdmin": existing_users == 0, "approved": bool(approved)},
+            "pendingApproval": not bool(approved),
+        }
+        headers = None
+        if approved:
+            token = self.create_session(user_id)
+            response["csrfToken"] = self.csrf_token_for_session(token)
+            headers = {"Set-Cookie": self.cookie_header("services_session", token)}
+
+        self.send_json(201, response, headers)
 
     def login(self):
         body = self.read_json()
         email = str(body.get("email", "")).strip().lower()
         password = str(body.get("password", ""))
+        if self.login_is_locked(email):
+            raise PublicError("Demasiados intentos fallidos. Espere unos minutos e intente nuevamente.")
         with connect() as conn:
             user = conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
         if not user or not verify_password(password, user["password_hash"]):
+            self.record_login_failure(email)
             raise PublicError("Email o clave incorrectos.")
+        if not user["approved"]:
+            raise PublicError("Su cuenta esta pendiente de aprobacion manual.")
 
+        self.clear_login_failures(email)
         token = self.create_session(user["id"])
-        self.send_json(200, {"user": public_user(user)}, {"Set-Cookie": self.cookie_header("services_session", token)})
+        self.send_json(
+            200,
+            {"user": public_user(user), "csrfToken": self.csrf_token_for_session(token)},
+            {"Set-Cookie": self.cookie_header("services_session", token)},
+        )
 
     def logout(self):
         token = self.session_token("services_session")
@@ -284,8 +336,8 @@ class ServicesHandler(BaseHTTPRequestHandler):
             {"ok": True},
             {
                 "Set-Cookie": [
-                    "services_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
-                    "services_admin_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
+                    self.expired_cookie_header("services_session"),
+                    self.expired_cookie_header("services_admin_session"),
                 ]
             },
         )
@@ -299,7 +351,7 @@ class ServicesHandler(BaseHTTPRequestHandler):
         with connect() as conn:
             rows = conn.execute(
                 """
-                SELECT id, name, email, is_admin, created_at
+                SELECT id, name, email, is_admin, approved, created_at
                 FROM users
                 ORDER BY created_at DESC
                 """
@@ -313,6 +365,7 @@ class ServicesHandler(BaseHTTPRequestHandler):
                 "name": row["name"],
                 "email": row["email"],
                 "isAdmin": bool(row["is_admin"]),
+                "approved": bool(row["approved"]),
                 "createdAt": row["created_at"],
                 "counts": {
                     "clients": len(state.get("clients", [])),
@@ -321,7 +374,11 @@ class ServicesHandler(BaseHTTPRequestHandler):
                     "services": len(state.get("services", [])),
                 },
             })
-        self.send_json(200, {"users": users, "admin": public_user(admin)})
+        self.send_json(200, {
+            "users": users,
+            "admin": public_user(admin),
+            "csrfToken": self.csrf_token_for_session(self.session_token("services_session")),
+        })
 
     def admin_impersonate(self):
         admin = self.admin_user()
@@ -366,7 +423,7 @@ class ServicesHandler(BaseHTTPRequestHandler):
             {
                 "Set-Cookie": [
                     self.cookie_header("services_session", admin_token),
-                    "services_admin_session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
+                    self.expired_cookie_header("services_admin_session"),
                 ]
             },
         )
@@ -392,39 +449,86 @@ class ServicesHandler(BaseHTTPRequestHandler):
 
         self.send_json(200, {"ok": True, "deletedUser": public_user(target)})
 
+    def admin_approve_user(self):
+        admin = self.admin_user()
+        if not admin:
+            self.send_json(403, {"error": "No tiene permisos de administrador."})
+            return
+
+        body = self.read_json()
+        target_id = str(body.get("userId", "")).strip()
+        if not target_id:
+            raise PublicError("Usuario no valido.")
+
+        with connect() as conn:
+            target = conn.execute("SELECT * FROM users WHERE id = ?", (target_id,)).fetchone()
+            if not target:
+                raise PublicError("Usuario no encontrado.")
+            conn.execute("UPDATE users SET approved = 1 WHERE id = ?", (target_id,))
+
+        self.send_json(200, {"ok": True, "approvedUser": public_user(target)})
+
     def current_user(self):
         token = self.session_token("services_session")
-        return self.user_from_session(token)
+        return self.user_from_session(token, require_approved=True)
 
     def admin_user(self):
         admin_token = self.session_token("services_admin_session")
-        user = self.user_from_session(admin_token)
+        user = self.user_from_session(admin_token, require_approved=True)
         if user and user["is_admin"]:
             return user
-        user = self.user_from_session(self.session_token("services_session"))
+        user = self.user_from_session(self.session_token("services_session"), require_approved=True)
         if user and user["is_admin"]:
             return user
         return None
 
-    def user_from_session(self, token):
+    def user_from_session(self, token, require_approved=False):
         if not token:
             return None
         with connect() as conn:
+            query = [
+                "SELECT users.*",
+                "FROM sessions",
+                "JOIN users ON users.id = sessions.user_id",
+                "WHERE sessions.token = ?",
+            ]
+            params = [token]
+            if require_approved:
+                query.append("AND users.approved = 1")
             return conn.execute(
-                """
-                SELECT users.*
-                FROM sessions
-                JOIN users ON users.id = sessions.user_id
-                WHERE sessions.token = ?
-                """,
-                (token,),
+                "\n".join(query),
+                params,
             ).fetchone()
 
     def create_session(self, user_id):
         token = secrets.token_hex(32)
+        csrf_token = secrets.token_hex(32)
         with connect() as conn:
-            conn.execute("INSERT INTO sessions (token, user_id) VALUES (?, ?)", (token, user_id))
+            conn.execute(
+                "INSERT INTO sessions (token, user_id, csrf_token) VALUES (?, ?, ?)",
+                (token, user_id, csrf_token),
+            )
         return token
+
+    def csrf_token_for_session(self, token):
+        if not token:
+            return ""
+        with connect() as conn:
+            row = conn.execute("SELECT csrf_token FROM sessions WHERE token = ?", (token,)).fetchone()
+            if not row:
+                return ""
+            csrf_token = row["csrf_token"]
+            if csrf_token:
+                return csrf_token
+            csrf_token = secrets.token_hex(32)
+            conn.execute("UPDATE sessions SET csrf_token = ? WHERE token = ?", (csrf_token, token))
+            return csrf_token
+
+    def valid_csrf_token(self):
+        token = self.session_token("services_session")
+        expected = self.csrf_token_for_session(token)
+        provided = self.headers.get("X-CSRF-Token", "")
+        return bool(expected and provided and hmac.compare_digest(expected, provided))
 
     def session_token(self, name):
         raw = self.headers.get("Cookie", "")
@@ -434,7 +538,50 @@ class ServicesHandler(BaseHTTPRequestHandler):
         return morsel.value if morsel else ""
 
     def cookie_header(self, name, token):
-        return f"{name}={token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000"
+        secure = "; Secure" if self.should_secure_cookies() else ""
+        return f"{name}={token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=2592000{secure}"
+
+    def expired_cookie_header(self, name):
+        secure = "; Secure" if self.should_secure_cookies() else ""
+        return f"{name}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0{secure}"
+
+    def should_secure_cookies(self):
+        forwarded_proto = self.headers.get("X-Forwarded-Proto", "")
+        return forwarded_proto == "https" or is_render_environment()
+
+    def client_ip(self):
+        forwarded = self.headers.get("X-Forwarded-For", "")
+        if forwarded:
+            return forwarded.split(",", 1)[0].strip()
+        return self.client_address[0] if self.client_address else "unknown"
+
+    def login_key(self, email):
+        return f"{self.client_ip()}|{email}"
+
+    def login_is_locked(self, email):
+        attempt = LOGIN_ATTEMPTS.get(self.login_key(email))
+        if not attempt:
+            return False
+        now = time.time()
+        if attempt.get("locked_until", 0) > now:
+            return True
+        if now - attempt.get("first_at", now) > LOGIN_WINDOW_SECONDS:
+            LOGIN_ATTEMPTS.pop(self.login_key(email), None)
+        return False
+
+    def record_login_failure(self, email):
+        key = self.login_key(email)
+        now = time.time()
+        attempt = LOGIN_ATTEMPTS.get(key)
+        if not attempt or now - attempt.get("first_at", now) > LOGIN_WINDOW_SECONDS:
+            attempt = {"count": 0, "first_at": now, "locked_until": 0}
+        attempt["count"] += 1
+        if attempt["count"] >= LOGIN_MAX_ATTEMPTS:
+            attempt["locked_until"] = now + LOGIN_LOCK_SECONDS
+        LOGIN_ATTEMPTS[key] = attempt
+
+    def clear_login_failures(self, email):
+        LOGIN_ATTEMPTS.pop(self.login_key(email), None)
 
     def serve_static(self):
         path = self.path.split("?", 1)[0]
@@ -458,6 +605,7 @@ class ServicesHandler(BaseHTTPRequestHandler):
         mime = mimetypes.guess_type(file_path)[0] or "application/octet-stream"
         self.send_response(200)
         self.send_header("Content-Type", mime)
+        self.send_security_headers()
         self.end_headers()
         self.wfile.write(file_path.read_bytes())
 
@@ -474,6 +622,7 @@ class ServicesHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self.send_security_headers()
         for key, value in (extra_headers or {}).items():
             if isinstance(value, list):
                 for item in value:
@@ -482,6 +631,11 @@ class ServicesHandler(BaseHTTPRequestHandler):
                 self.send_header(key, value)
         self.end_headers()
         self.wfile.write(body)
+
+    def send_security_headers(self):
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
 
     def log_message(self, format, *args):
         return

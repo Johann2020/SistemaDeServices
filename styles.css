@@ -133,6 +133,13 @@ body {
   font-weight: 600;
 }
 
+.auth-message {
+  min-height: 18px;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .admin-page {
   min-height: 100vh;
   padding: 24px;
@@ -192,6 +199,16 @@ body {
   margin-left: 8px;
   background: #e7f3f8;
   color: var(--accent-strong);
+}
+
+.admin-badge.pending {
+  background: #fff1da;
+  color: var(--orange);
+}
+
+.admin-badge.approved {
+  background: #e6f4ea;
+  color: var(--green);
 }
 
 .admin-row-actions {

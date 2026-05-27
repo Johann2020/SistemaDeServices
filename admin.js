@@ -6,6 +6,7 @@ const logoutButton = document.querySelector("#admin-logout");
 const openAppButton = document.querySelector("#admin-open-app");
 
 let currentAdmin = null;
+let csrfToken = "";
 
 bootAdmin();
 
@@ -15,7 +16,11 @@ async function bootAdmin() {
     window.location.href = "/app";
   });
   logoutButton.addEventListener("click", async () => {
-    await fetch("/api/logout", { method: "POST", credentials: "same-origin" });
+    await fetch("/api/logout", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: csrfToken ? { "X-CSRF-Token": csrfToken } : {},
+    });
     window.location.href = "/";
   });
   await loadUsers();
@@ -27,6 +32,7 @@ async function loadUsers() {
   try {
     const data = await fetchJson("/api/admin/users");
     currentAdmin = data.admin;
+    csrfToken = data.csrfToken || "";
     renderUsers(data.users || []);
   } catch (error) {
     errorBox.textContent = error.message;
@@ -43,10 +49,15 @@ function renderUsers(users) {
     const tr = document.createElement("tr");
     const counts = user.counts || {};
     const isSelf = currentAdmin?.id === user.id;
+    const approvalBadge = user.isAdmin
+      ? '<span class="admin-badge approved">Admin</span>'
+      : user.approved
+        ? '<span class="admin-badge approved">Aprobado</span>'
+        : '<span class="admin-badge pending">Pendiente</span>';
     tr.innerHTML = `
       <td>
         <strong>${escapeHtml(user.name)}</strong>
-        ${user.isAdmin ? '<span class="admin-badge">Admin</span>' : ""}
+        ${approvalBadge}
       </td>
       <td>${escapeHtml(user.email)}</td>
       <td>${escapeHtml(formatDateTime(user.createdAt))}</td>
@@ -60,9 +71,15 @@ function renderUsers(users) {
       </td>
       <td>
         <div class="admin-row-actions">
-          <button class="small-button" type="button" data-impersonate="${escapeHtml(user.id)}" ${isSelf ? "disabled" : ""}>
-            ${isSelf ? "Tu cuenta" : "Entrar"}
-          </button>
+          ${
+            user.approved
+              ? `<button class="small-button" type="button" data-impersonate="${escapeHtml(user.id)}" ${isSelf ? "disabled" : ""}>
+                  ${isSelf ? "Tu cuenta" : "Entrar"}
+                </button>`
+              : `<button class="small-button" type="button" data-approve-user="${escapeHtml(user.id)}">
+                  Aprobar
+                </button>`
+          }
           <button class="small-button delete" type="button" data-delete-user="${escapeHtml(user.id)}" ${isSelf ? "disabled" : ""}>
             Eliminar
           </button>
@@ -81,6 +98,12 @@ function renderUsers(users) {
     button.addEventListener("click", async () => {
       const user = users.find((item) => item.id === button.dataset.deleteUser);
       if (user) await deleteUser(user);
+    });
+  });
+  usersBody.querySelectorAll("[data-approve-user]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const user = users.find((item) => item.id === button.dataset.approveUser);
+      if (user) await approveUser(user);
     });
   });
 }
@@ -128,10 +151,29 @@ async function deleteUser(user) {
   }
 }
 
+async function approveUser(user) {
+  errorBox.textContent = "";
+  try {
+    await fetchJson("/api/admin/approve-user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id }),
+    });
+    await loadUsers();
+  } catch (error) {
+    errorBox.textContent = error.message;
+  }
+}
+
 async function fetchJson(url, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
   const response = await fetch(url, {
     credentials: "same-origin",
     ...options,
+    headers: {
+      ...(method !== "GET" && csrfToken ? { "X-CSRF-Token": csrfToken } : {}),
+      ...(options.headers || {}),
+    },
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
