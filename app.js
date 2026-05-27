@@ -1316,7 +1316,7 @@ function renderServices() {
     els.servicesBody.appendChild(tr);
   });
 
-  els.emptyServices.classList.toggle("visible", filtered.length === 0);
+  els.emptyServices.classList.toggle("visible", pageData.total === 0);
   renderPagination("services", pageData);
 }
 
@@ -1895,7 +1895,7 @@ function renderEquipment() {
     els.equipmentBody.appendChild(tr);
   });
 
-  els.emptyEquipment.classList.toggle("visible", filtered.length === 0);
+  els.emptyEquipment.classList.toggle("visible", pageData.total === 0);
   renderPagination("equipment", pageData);
 }
 
@@ -1934,7 +1934,7 @@ function renderProducts() {
     els.productsBody.appendChild(tr);
   });
 
-  els.emptyProducts.classList.toggle("visible", filtered.length === 0);
+  els.emptyProducts.classList.toggle("visible", pageData.total === 0);
   renderPagination("products", pageData);
 }
 
@@ -2304,7 +2304,7 @@ function renderClients() {
     els.tbody.appendChild(tr);
   });
 
-  els.empty.classList.toggle("visible", filtered.length === 0);
+  els.empty.classList.toggle("visible", pageData.total === 0);
   renderPagination("clients", pageData);
 }
 

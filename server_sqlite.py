@@ -291,9 +291,45 @@ def read_items_page(user_id, bucket, params):
     query = str(params.get("q", [""])[0]).strip().lower()
     where = ["user_id = ?", "bucket = ?"]
     values = [user_id, bucket]
+    related_client_ids = []
+    related_equipment_ids = []
     if query:
-        where.append("search_text LIKE ?")
+        search_clauses = ["search_text LIKE ?"]
         values.append(f"%{query}%")
+        with connect() as conn:
+            if bucket in {"equipment", "services"}:
+                related_client_ids = [
+                    str(row["item_id"])
+                    for row in conn.execute(
+                        """
+                        SELECT item_id
+                        FROM tenant_items
+                        WHERE user_id = ? AND bucket = 'clients' AND search_text LIKE ?
+                        """,
+                        (user_id, f"%{query}%"),
+                    ).fetchall()
+                ]
+            if bucket == "services":
+                related_equipment_ids = [
+                    str(row["item_id"])
+                    for row in conn.execute(
+                        """
+                        SELECT item_id
+                        FROM tenant_items
+                        WHERE user_id = ? AND bucket = 'equipment' AND search_text LIKE ?
+                        """,
+                        (user_id, f"%{query}%"),
+                    ).fetchall()
+                ]
+        if related_client_ids:
+            placeholders = ", ".join("?" for _ in related_client_ids)
+            search_clauses.append(f"CAST(json_extract(data, '$.clientId') AS TEXT) IN ({placeholders})")
+            values.extend(related_client_ids)
+        if related_equipment_ids:
+            placeholders = ", ".join("?" for _ in related_equipment_ids)
+            search_clauses.append(f"CAST(json_extract(data, '$.equipmentId') AS TEXT) IN ({placeholders})")
+            values.extend(related_equipment_ids)
+        where.append(f"({' OR '.join(search_clauses)})")
 
     if bucket == "services":
         status = str(params.get("status", [""])[0]).strip()
