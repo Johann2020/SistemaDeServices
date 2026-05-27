@@ -4,6 +4,10 @@ const PRODUCTS_STORAGE_KEY = "services_web_products_v1";
 const SERVICES_STORAGE_KEY = "services_web_services_v1";
 const SETTINGS_STORAGE_KEY = "services_web_settings_v1";
 const PATTERN_SIZE = 230;
+const SERVICE_DELAY_STATUSES = {
+  review: "Revision demorada",
+  pickup: "Retiro demorado",
+};
 
 const state = {
   clients: loadClients(),
@@ -23,6 +27,7 @@ const state = {
   actionMenuRecord: null,
   serviceHistoryFilter: null,
   toastTimers: new Map(),
+  serviceDelayPromptShown: false,
   remoteEnabled: false,
   currentUser: null,
   adminUser: null,
@@ -74,6 +79,8 @@ const els = {
   statusCounts: {
     sinRevisar: document.querySelector("#status-sin-revisar-count"),
     revisado: document.querySelector("#status-revisado-count"),
+    revisionDemorada: document.querySelector("#status-revision-demorada-count"),
+    retiroDemorado: document.querySelector("#status-retiro-demorado-count"),
     entregado: document.querySelector("#status-entregado-count"),
     cancelado: document.querySelector("#status-cancelado-count"),
   },
@@ -202,8 +209,13 @@ const els = {
     marginPercent: document.querySelector("#margin-percent"),
     frequentWorkDescription: document.querySelector("#frequent-work-description"),
     frequentWorkPrice: document.querySelector("#frequent-work-price"),
+    reviewDelayAmount: document.querySelector("#service-review-delay-amount"),
+    reviewDelayUnit: document.querySelector("#service-review-delay-unit"),
+    pickupDelayAmount: document.querySelector("#service-pickup-delay-amount"),
+    pickupDelayUnit: document.querySelector("#service-pickup-delay-unit"),
   },
   saveTransport: document.querySelector("#save-transport"),
+  saveServiceDelays: document.querySelector("#save-service-delays"),
   addMargin: document.querySelector("#add-margin"),
   addFrequentWork: document.querySelector("#add-frequent-work"),
   deleteOrphanClients: document.querySelector("#delete-orphan-clients"),
@@ -230,6 +242,7 @@ async function boot() {
   renderAll();
   decorateActionButtons();
   loadProvinces();
+  window.setTimeout(checkServiceDelayAlerts, 400);
 }
 
 function disableBrowserAutocomplete() {
@@ -439,6 +452,7 @@ function wireEvents() {
   els.quickEditPart.addEventListener("click", openQuickEditPartDialog);
   els.saveWorkPreset.addEventListener("click", addCurrentWorkToPreset);
   els.saveTransport.addEventListener("click", saveTransportCost);
+  els.saveServiceDelays?.addEventListener("click", saveServiceDelaySettings);
   els.addMargin.addEventListener("click", addMargin);
   els.addFrequentWork.addEventListener("click", addFrequentWork);
   els.deleteOrphanClients?.addEventListener("click", deleteOrphanClients);
@@ -719,7 +733,33 @@ function normalizeSettings(settings = {}) {
     margins: Array.isArray(settings.margins) ? settings.margins : [],
     frequentWorks: Array.isArray(settings.frequentWorks) ? settings.frequentWorks : [],
     serviceFilters: settings.serviceFilters || { all: true, statuses: [] },
+    serviceDelays: normalizeServiceDelays(settings.serviceDelays),
+    serviceDelayReminders: normalizeServiceDelayReminders(settings.serviceDelayReminders),
   };
+}
+
+function normalizeServiceDelays(delays = {}) {
+  const review = delays.review || {};
+  const pickup = delays.pickup || {};
+  return {
+    review: {
+      amount: Math.max(0, Number(review.amount || 0)),
+      unit: review.unit === "months" ? "months" : "days",
+    },
+    pickup: {
+      amount: Math.max(0, Number(pickup.amount || 0)),
+      unit: pickup.unit === "months" ? "months" : "days",
+    },
+  };
+}
+
+function normalizeServiceDelayReminders(reminders = {}) {
+  if (!reminders || typeof reminders !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(reminders)
+      .filter(([, value]) => value === "never" || Number.isFinite(new Date(value).getTime()))
+      .map(([key, value]) => [String(key), value])
+  );
 }
 
 function loadClients() {
@@ -792,6 +832,8 @@ function loadSettings() {
       all: true,
       statuses: [],
     },
+    serviceDelays: normalizeServiceDelays(),
+    serviceDelayReminders: {},
   };
 }
 
@@ -938,6 +980,7 @@ function decorateActionButtons(root = document) {
     ["Limpiar", "cancelar.svg"],
     ["Finalizar", "aceptar.svg"],
     ["Entregar", "entregar.svg"],
+    ["Marcar", "aceptar.svg"],
     ["Historial cliente", "clientes.svg"],
     ["Historial equipo", "equipos.svg"],
     ["Ver clientes", "flecha.png"],
@@ -966,6 +1009,8 @@ function renderMetrics() {
 
   els.statusCounts.sinRevisar.textContent = countServicesByStatus("Sin revisar");
   els.statusCounts.revisado.textContent = countServicesByStatus("Revisado");
+  els.statusCounts.revisionDemorada.textContent = countServicesByStatus("Revision demorada");
+  els.statusCounts.retiroDemorado.textContent = countServicesByStatus("Retiro demorado");
   els.statusCounts.entregado.textContent = countServicesByStatus("Entregado");
   els.statusCounts.cancelado.textContent = countServicesByStatus("Cancelado");
 }
@@ -1118,9 +1163,9 @@ function actionMenuItems(type, id) {
     const actions = [];
     const service = state.services.find(s => s.id === id);
     if (service) {
-      if (service.status === "Sin revisar") {
+      if (["Sin revisar", "Revision demorada"].includes(service.status)) {
         actions.push({ action: "finish-service", label: "Finalizar" });
-      } else if (service.status === "Revisado") {
+      } else if (["Revisado", "Retiro demorado"].includes(service.status)) {
         actions.push({ action: "deliver-service", label: "Entregar" });
       }
       if (service.status !== "Cancelado") {
@@ -1231,6 +1276,127 @@ function changeServiceStatus(id, newStatus) {
   });
 }
 
+async function checkServiceDelayAlerts() {
+  if (state.serviceDelayPromptShown) return;
+  state.serviceDelayPromptShown = true;
+
+  const delays = normalizeServiceDelays(state.settings.serviceDelays);
+  const reviewDays = delayRuleToDays(delays.review);
+  const pickupDays = delayRuleToDays(delays.pickup);
+  const reviewOverdue = reviewDays > 0
+    ? state.services.filter((service) =>
+        service.status === "Sin revisar" &&
+        serviceAgeDays(service.entryDate) >= reviewDays &&
+        shouldShowServiceDelayReminder(service.id, "review")
+      )
+    : [];
+  const pickupOverdue = pickupDays > 0
+    ? state.services.filter((service) =>
+        service.status === "Revisado" &&
+        serviceAgeDays(service.finishDate) >= pickupDays &&
+        shouldShowServiceDelayReminder(service.id, "pickup")
+      )
+    : [];
+
+  if (!reviewOverdue.length && !pickupOverdue.length) return;
+
+  const lines = [];
+  if (reviewOverdue.length) {
+    lines.push(`${reviewOverdue.length} service(s) siguen sin ver despues del plazo configurado.`);
+  }
+  if (pickupOverdue.length) {
+    lines.push(`${pickupOverdue.length} service(s) finalizados no fueron retirados dentro del plazo configurado.`);
+  }
+  lines.push("", "Desea marcarlos con estado de demora o recordarlo mas adelante?");
+
+  const choices = [];
+  if (reviewOverdue.length) {
+    choices.push({ label: "Revision demorada", value: "review", className: "ghost-button" });
+  }
+  if (pickupOverdue.length) {
+    choices.push({ label: "Retiro demorado", value: "pickup", className: "ghost-button" });
+  }
+  if (reviewOverdue.length && pickupOverdue.length) {
+    choices.unshift({ label: "Marcar ambos", value: "all", className: "primary-action" });
+  }
+  choices.push(
+    { label: "Recordar en 1 dia", value: "snooze-1", className: "ghost-button" },
+    { label: "Recordar en 7 dias", value: "snooze-7", className: "ghost-button" },
+    { label: "Recordar en 15 dias", value: "snooze-15", className: "ghost-button" },
+    { label: "Recordar en 30 dias", value: "snooze-30", className: "ghost-button" },
+    { label: "No volver a recordar", value: "snooze-never", className: "danger-button" }
+  );
+
+  const choice = await showMessage("Services demorados", lines.join("\n"), "warning", "choices", choices);
+  if (!choice) return;
+
+  const reviewIds = new Set(reviewOverdue.map((service) => Number(service.id)));
+  const pickupIds = new Set(pickupOverdue.map((service) => Number(service.id)));
+
+  if (String(choice).startsWith("snooze-")) {
+    snoozeServiceDelayAlerts(choice, reviewIds, pickupIds);
+    return;
+  }
+
+  const snapshot = snapshotData();
+  state.services = state.services.map((service) => {
+    if ((choice === "all" || choice === "review") && reviewIds.has(Number(service.id))) {
+      return { ...service, status: SERVICE_DELAY_STATUSES.review };
+    }
+    if ((choice === "all" || choice === "pickup") && pickupIds.has(Number(service.id))) {
+      return { ...service, status: SERVICE_DELAY_STATUSES.pickup };
+    }
+    return service;
+  });
+  persistServices();
+  renderAll();
+  showToast("Estados de demora actualizados", {
+    actionLabel: "Deshacer",
+    onAction: () => restoreSnapshot(snapshot),
+  });
+}
+
+function snoozeServiceDelayAlerts(choice, reviewIds, pickupIds) {
+  state.settings.serviceDelayReminders = normalizeServiceDelayReminders(state.settings.serviceDelayReminders);
+  const value = choice === "snooze-never"
+    ? "never"
+    : new Date(Date.now() + Number(choice.replace("snooze-", "")) * 86400000).toISOString();
+  reviewIds.forEach((id) => {
+    state.settings.serviceDelayReminders[serviceDelayReminderKey(id, "review")] = value;
+  });
+  pickupIds.forEach((id) => {
+    state.settings.serviceDelayReminders[serviceDelayReminderKey(id, "pickup")] = value;
+  });
+  persistSettings();
+  renderAll();
+  showToast(choice === "snooze-never" ? "Recordatorio desactivado" : "Recordatorio pospuesto");
+}
+
+function shouldShowServiceDelayReminder(serviceId, type) {
+  const reminders = normalizeServiceDelayReminders(state.settings.serviceDelayReminders);
+  const value = reminders[serviceDelayReminderKey(serviceId, type)];
+  if (!value) return true;
+  if (value === "never") return false;
+  const remindAt = new Date(value).getTime();
+  return Number.isFinite(remindAt) ? Date.now() >= remindAt : true;
+}
+
+function serviceDelayReminderKey(serviceId, type) {
+  return `${type}:${serviceId}`;
+}
+
+function delayRuleToDays(rule = {}) {
+  const amount = Math.max(0, Number(rule.amount || 0));
+  return rule.unit === "months" ? amount * 30 : amount;
+}
+
+function serviceAgeDays(dateValue) {
+  if (!dateValue) return 0;
+  const time = new Date(dateValue).getTime();
+  if (!Number.isFinite(time)) return 0;
+  return Math.floor((Date.now() - time) / 86400000);
+}
+
 function applyServiceHistoryFilter(type, id) {
   state.serviceHistoryFilter = { type, id };
   state.settings.serviceFilters = { all: true, statuses: [] };
@@ -1305,6 +1471,13 @@ function getSelectedRow() {
 
 function renderSettings() {
   els.settingsFields.transportCost.value = String(state.settings.transportCost || 0);
+  const serviceDelays = normalizeServiceDelays(state.settings.serviceDelays);
+  if (els.settingsFields.reviewDelayAmount) {
+    els.settingsFields.reviewDelayAmount.value = serviceDelays.review.amount ? String(serviceDelays.review.amount) : "";
+    els.settingsFields.reviewDelayUnit.value = serviceDelays.review.unit;
+    els.settingsFields.pickupDelayAmount.value = serviceDelays.pickup.amount ? String(serviceDelays.pickup.amount) : "";
+    els.settingsFields.pickupDelayUnit.value = serviceDelays.pickup.unit;
+  }
   const orphanCount = getOrphanClients().length;
   if (els.orphanClientsText) {
     els.orphanClientsText.textContent = orphanCount
@@ -1398,6 +1571,24 @@ function saveTransportCost() {
   persistSettings();
   renderAll();
   showToast("Costo de transporte actualizado");
+}
+
+function saveServiceDelaySettings() {
+  state.settings.serviceDelays = normalizeServiceDelays({
+    review: {
+      amount: parseMoney(els.settingsFields.reviewDelayAmount.value),
+      unit: els.settingsFields.reviewDelayUnit.value,
+    },
+    pickup: {
+      amount: parseMoney(els.settingsFields.pickupDelayAmount.value),
+      unit: els.settingsFields.pickupDelayUnit.value,
+    },
+  });
+  state.serviceDelayPromptShown = false;
+  persistSettings();
+  renderAll();
+  showToast("Alertas de services actualizadas");
+  window.setTimeout(checkServiceDelayAlerts, 200);
 }
 
 function addMargin() {
@@ -2399,7 +2590,8 @@ function saveService(event) {
   const previousStatus = state.editingServiceId
     ? state.services.find((service) => service.id === state.editingServiceId)?.status
     : null;
-  const resetToNewStage = ["Revisado", "Entregado"].includes(previousStatus) && data.status === "Sin revisar";
+  const resetToNewStage = ["Revisado", "Retiro demorado", "Entregado"].includes(previousStatus) &&
+    ["Sin revisar", "Revision demorada"].includes(data.status);
   const serviceData = resetToNewStage ? resetServiceWorkStage(data) : data;
   let savedId = state.editingServiceId;
   if (state.editingServiceId) {
@@ -2414,7 +2606,7 @@ function saveService(event) {
       id: savedId,
       ...serviceData,
       entryDate: new Date().toISOString(),
-      finishDate: ["Revisado", "Entregado"].includes(serviceData.status) ? new Date().toISOString() : "",
+      finishDate: ["Revisado", "Retiro demorado", "Entregado"].includes(serviceData.status) ? new Date().toISOString() : "",
       deliveryDate: serviceData.status === "Entregado" ? new Date().toISOString() : "",
     });
   }
@@ -2523,7 +2715,7 @@ function showServiceTab(tabId) {
 function configureServiceTabs(isNew) {
   const status = els.serviceFields.status.value || "Sin revisar";
   const statusVisible = !isNew;
-  const allowExecutionTabs = status !== "Sin revisar" && !isNew;
+  const allowExecutionTabs = !["Sin revisar", "Revision demorada"].includes(status) && !isNew;
   els.serviceTabs.forEach((tab) => {
     const tabId = tab.dataset.serviceTab;
     const shouldHide = tabId === "service-status-tab"
@@ -3085,14 +3277,14 @@ async function deleteService(id) {
 
 function nextServiceDates(previous, newStatus) {
   const now = new Date().toISOString();
-  if (newStatus === "Sin revisar") {
+  if (["Sin revisar", "Revision demorada"].includes(newStatus)) {
     return {
       finishDate: "",
       deliveryDate: "",
     };
   }
   return {
-    finishDate: ["Revisado", "Entregado"].includes(newStatus) && !previous.finishDate ? now : previous.finishDate,
+    finishDate: ["Revisado", "Retiro demorado", "Entregado"].includes(newStatus) && !previous.finishDate ? now : previous.finishDate,
     deliveryDate: newStatus === "Entregado" && !previous.deliveryDate ? now : previous.deliveryDate,
   };
 }
@@ -3691,9 +3883,11 @@ function statusClass(status) {
 function serviceStatusRank(status) {
   return {
     "Sin revisar": 1,
-    Revisado: 2,
-    Entregado: 3,
-    Cancelado: 4,
+    "Revision demorada": 2,
+    Revisado: 3,
+    "Retiro demorado": 4,
+    Entregado: 5,
+    Cancelado: 6,
   }[status] || 99;
 }
 

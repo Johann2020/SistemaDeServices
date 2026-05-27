@@ -105,6 +105,12 @@
                 <button class="status-card status-card-revisado" type="button" data-status-filter="Revisado">
                   <span>Finalizado</span><strong id="status-revisado-count">0</strong>
                 </button>
+                <button class="status-card status-card-revision-demorada" type="button" data-status-filter="Revision demorada">
+                  <span>Revision demorada</span><strong id="status-revision-demorada-count">0</strong>
+                </button>
+                <button class="status-card status-card-retiro-demorado" type="button" data-status-filter="Retiro demorado">
+                  <span>Retiro demorado</span><strong id="status-retiro-demorado-count">0</strong>
+                </button>
                 <button class="status-card status-card-entregado" type="button" data-status-filter="Entregado">
                   <span>Entregado</span><strong id="status-entregado-count">0</strong>
                 </button>
@@ -226,6 +232,8 @@
             <label><input type="checkbox" id="filter-all" checked> Todos</label>
             <label><input type="checkbox" class="service-filter" value="Sin revisar"> Sin ver</label>
             <label><input type="checkbox" class="service-filter" value="Revisado"> Finalizado</label>
+            <label><input type="checkbox" class="service-filter" value="Revision demorada"> Revision demorada</label>
+            <label><input type="checkbox" class="service-filter" value="Retiro demorado"> Retiro demorado</label>
             <label><input type="checkbox" class="service-filter" value="Entregado"> Entregado</label>
             <label><input type="checkbox" class="service-filter" value="Cancelado"> Cancelado</label>
           </div>
@@ -311,6 +319,36 @@
               <div class="settings-section-heading">
                 <span class="panel-kicker">Servicios</span>
               </div>
+              <section class="panel">
+                <div class="panel-heading">
+                  <h2>Alertas por demora</h2>
+                </div>
+                <div class="delay-settings">
+                  <label>
+                    Sin ver
+                    <input id="service-review-delay-amount" inputmode="numeric" placeholder="Ej. 7">
+                  </label>
+                  <label>
+                    Unidad
+                    <select id="service-review-delay-unit">
+                      <option value="days">Dias</option>
+                      <option value="months">Meses</option>
+                    </select>
+                  </label>
+                  <label>
+                    Finalizado
+                    <input id="service-pickup-delay-amount" inputmode="numeric" placeholder="Ej. 30">
+                  </label>
+                  <label>
+                    Unidad
+                    <select id="service-pickup-delay-unit">
+                      <option value="days">Dias</option>
+                      <option value="months">Meses</option>
+                    </select>
+                  </label>
+                  <button class="primary-action" type="button" id="save-service-delays">Guardar</button>
+                </div>
+              </section>
               <section class="panel">
                 <div class="panel-heading">
                   <h2>Trabajos frecuentes</h2>
@@ -607,6 +645,8 @@
                 <select id="service-status" name="status">
                   <option value="Sin revisar">Sin ver</option>
                   <option value="Revisado">Finalizado</option>
+                  <option>Revision demorada</option>
+                  <option>Retiro demorado</option>
                   <option>Entregado</option>
                   <option>Cancelado</option>
                 </select>

@@ -642,6 +642,14 @@ h2 {
   background: #eaf8ef;
 }
 
+.status-card-revision-demorada {
+  background: #fff0cc;
+}
+
+.status-card-retiro-demorado {
+  background: #efe8f7;
+}
+
 .status-card-entregado {
   background: #e7f3f8;
 }
@@ -1543,6 +1551,14 @@ tbody tr.work-pending {
   background: #eaf8ef;
 }
 
+.filter-strip label:has(input[value="Revision demorada"]) {
+  background: #fff0cc;
+}
+
+.filter-strip label:has(input[value="Retiro demorado"]) {
+  background: #efe8f7;
+}
+
 .filter-strip label:has(input[value="Entregado"]) {
   background: #e7f3f8;
 }
@@ -1626,6 +1642,14 @@ tbody tr.work-pending {
 
 .status-revisado {
   background: var(--green);
+}
+
+.status-revision-demorada {
+  background: #9a6a13;
+}
+
+.status-retiro-demorado {
+  background: #79569b;
 }
 
 .status-entregado {
@@ -1723,8 +1747,16 @@ tbody tr.work-pending {
   margin-bottom: 14px;
 }
 
+.delay-settings {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) 130px minmax(150px, 1fr) 130px 120px;
+  gap: 12px;
+  align-items: end;
+}
+
 .work-entry label,
-.service-total label {
+.service-total label,
+.delay-settings label {
   display: grid;
   gap: 7px;
   color: #415065;
@@ -1733,7 +1765,9 @@ tbody tr.work-pending {
 }
 
 .work-entry input,
-.service-total input {
+.service-total input,
+.delay-settings input,
+.delay-settings select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -1936,6 +1970,7 @@ tbody tr.work-pending {
   .work-entry,
   .settings-grid .work-entry,
   .service-total,
+  .delay-settings,
   .inline-setting {
     grid-template-columns: 1fr;
   }
