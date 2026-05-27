@@ -119,6 +119,7 @@ const els = {
     model: document.querySelector("#equipment-model"),
     serial: document.querySelector("#equipment-serial"),
     condition: document.querySelector("#equipment-condition"),
+    observations: document.querySelector("#equipment-observations"),
     password: document.querySelector("#equipment-password"),
   },
   equipmentClientMenu: document.querySelector("#equipment-client-menu"),
@@ -306,6 +307,7 @@ function ensureDemoData() {
       model: demo[2],
       serial: demo[3],
       condition: demo[4],
+      observations: "",
       password: demo[5],
       pattern: demo[6],
       createdAt: new Date().toISOString(),
@@ -779,7 +781,10 @@ function loadEquipment() {
   const stored = localStorage.getItem(EQUIPMENT_STORAGE_KEY);
   if (stored) {
     try {
-      return JSON.parse(stored);
+      return JSON.parse(stored).map((item) => ({
+        ...item,
+        observations: item.observations || "",
+      }));
     } catch {
       localStorage.removeItem(EQUIPMENT_STORAGE_KEY);
     }
@@ -1655,6 +1660,7 @@ function renderEquipment() {
         equipment.serial,
         equipment.password,
         equipment.condition,
+        equipment.observations,
       ].join(" ")
     );
     return text.includes(query);
@@ -2325,6 +2331,7 @@ function openEquipmentDialog(id = null, seed = {}) {
     els.equipmentFields.model.value = equipment.model;
     els.equipmentFields.serial.value = equipment.serial;
     els.equipmentFields.condition.value = equipment.condition;
+    els.equipmentFields.observations.value = equipment.observations || "";
     els.equipmentFields.password.value = equipment.password;
     state.pattern = equipment.pattern ? equipment.pattern.split("-").map(Number) : [];
   } else if (seed.clientId) {
@@ -2462,6 +2469,7 @@ function keepSavedEquipmentVisible(id) {
     equipment.serial,
     equipment.password,
     equipment.condition,
+    equipment.observations,
   ].join(" "));
   const query = normalizeSearch(els.equipmentSearch.value);
   if (!text.includes(query)) {
@@ -2483,6 +2491,7 @@ function getEquipmentFormData() {
     model: els.equipmentFields.model.value.trim(),
     serial: els.equipmentFields.serial.value.trim(),
     condition: els.equipmentFields.condition.value.trim(),
+    observations: els.equipmentFields.observations.value.trim(),
     password: canHavePassword ? els.equipmentFields.password.value.trim() : "",
     pattern: canHavePattern ? state.pattern.join("-") : "",
   };
@@ -3755,6 +3764,7 @@ function equipmentTooltip(equipment) {
     `Password: ${equipment.password || "No disponible"}`,
     `Patron: ${patternText(equipment.pattern)}`,
     `Estado: ${equipment.condition || "N/A"}`,
+    `Observaciones: ${equipment.observations || "N/A"}`,
   ].join("\n");
 }
 

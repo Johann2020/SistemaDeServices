@@ -230,12 +230,12 @@
 
           <div class="filter-strip" aria-label="Filtros por estado">
             <label><input type="checkbox" id="filter-all" checked> Todos</label>
-            <label><input type="checkbox" class="service-filter" value="Sin revisar"> Sin ver</label>
-            <label><input type="checkbox" class="service-filter" value="Revisado"> Finalizado</label>
-            <label><input type="checkbox" class="service-filter" value="Revision demorada"> Revision demorada</label>
-            <label><input type="checkbox" class="service-filter" value="Retiro demorado"> Retiro demorado</label>
-            <label><input type="checkbox" class="service-filter" value="Entregado"> Entregado</label>
-            <label><input type="checkbox" class="service-filter" value="Cancelado"> Cancelado</label>
+            <label><input type="checkbox" class="service-filter" value="Sin revisar"> Sin ver <strong class="filter-strip-count" data-filter-count="Sin revisar">(0)</strong></label>
+            <label><input type="checkbox" class="service-filter" value="Revision demorada"> Revision demorada <strong class="filter-strip-count" data-filter-count="Revision demorada">(0)</strong></label>
+            <label><input type="checkbox" class="service-filter" value="Revisado"> Finalizado <strong class="filter-strip-count" data-filter-count="Revisado">(0)</strong></label>
+            <label><input type="checkbox" class="service-filter" value="Retiro demorado"> Retiro demorado <strong class="filter-strip-count" data-filter-count="Retiro demorado">(0)</strong></label>
+            <label><input type="checkbox" class="service-filter" value="Entregado"> Entregado <strong class="filter-strip-count" data-filter-count="Entregado">(0)</strong></label>
+            <label><input type="checkbox" class="service-filter" value="Cancelado"> Cancelado <strong class="filter-strip-count" data-filter-count="Cancelado">(0)</strong></label>
           </div>
 
           <div class="table-wrap">
@@ -508,6 +508,10 @@
           <label>
             Estado fisico
             <input id="equipment-condition" name="condition" autocomplete="off">
+          </label>
+          <label class="span-2">
+            Observaciones
+            <input id="equipment-observations" name="observations" autocomplete="off">
           </label>
           <label id="password-wrap">
             Password
