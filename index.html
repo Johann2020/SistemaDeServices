@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sistema de Services</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegacion principal">
+        <h2 class="menu-title">MENU PRINCIPAL</h2>
+
+        <nav class="nav-list">
+          <button class="nav-item active" type="button" data-view="home">
+            <img class="nav-icon" src="assets/icons/inicio.svg" alt="">
+            <span>Inicio</span>
+          </button>
+          <button class="nav-item" type="button" data-view="clients">
+            <img class="nav-icon" src="assets/icons/clientes.svg" alt="">
+            <span>Clientes</span>
+          </button>
+          <button class="nav-item" type="button" data-view="equipment">
+            <img class="nav-icon" src="assets/icons/equipos.svg" alt="">
+            <span>Equipos</span>
+          </button>
+          <button class="nav-item" type="button" data-view="products">
+            <img class="nav-icon" src="assets/icons/productos.svg" alt="">
+            <span>Productos</span>
+          </button>
+          <button class="nav-item" type="button" data-view="services">
+            <img class="nav-icon" src="assets/icons/servicios.svg" alt="">
+            <span>Servicios</span>
+          </button>
+          <button class="nav-item bottom-nav" type="button" data-view="settings">
+            <img class="nav-icon" src="assets/icons/configuracion.svg" alt="">
+            <span>Configuracion</span>
+          </button>
+          <button class="nav-item hidden" type="button" id="admin-panel-button">
+            <img class="nav-icon" src="assets/icons/configuracion.svg" alt="">
+            <span>Admin</span>
+          </button>
+          <button class="nav-item logout-nav" type="button" id="logout-button">
+            <img class="nav-icon" src="assets/icons/salir.svg" alt="">
+            <span>Salir</span>
+          </button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <div class="impersonation-banner hidden" id="impersonation-banner">
+          <span id="impersonation-text"></span>
+          <button class="ghost-button" type="button" id="stop-impersonation">Volver al admin</button>
+        </div>
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Sistema web</p>
+            <h1 id="view-title">Inicio</h1>
+          </div>
+          <button class="primary-action" type="button" id="quick-action">
+            <span>＋</span>
+            Nuevo cliente
+          </button>
+        </header>
+
+        <section class="view active" id="home-view">
+          <div class="metric-grid" aria-label="Resumen">
+            <article class="metric">
+              <span>Clientes</span>
+              <strong id="metric-clients">0</strong>
+            </article>
+            <article class="metric">
+              <span>Equipos</span>
+              <strong id="metric-equipment">0</strong>
+            </article>
+            <article class="metric">
+              <span>Servicios abiertos</span>
+              <strong id="metric-open-services">0</strong>
+            </article>
+            <article class="metric">
+              <span>Facturacion estimada</span>
+              <strong>$ 0</strong>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Actividad reciente</h2>
+              </div>
+              <div class="timeline" id="activity-list"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Estados de servicio</h2>
+              </div>
+              <div class="status-stack">
+                <button class="status-card status-card-sin-revisar" type="button" data-status-filter="Sin revisar">
+                  <span>Sin ver</span><strong id="status-sin-revisar-count">0</strong>
+                </button>
+                <button class="status-card status-card-revisado" type="button" data-status-filter="Revisado">
+                  <span>Finalizado</span><strong id="status-revisado-count">0</strong>
+                </button>
+                <button class="status-card status-card-entregado" type="button" data-status-filter="Entregado">
+                  <span>Entregado</span><strong id="status-entregado-count">0</strong>
+                </button>
+                <button class="status-card status-card-cancelado" type="button" data-status-filter="Cancelado">
+                  <span>Cancelado</span><strong id="status-cancelado-count">0</strong>
+                </button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="clients-view">
+          <div class="toolbar">
+            <label class="search-field">
+              <span>⌕</span>
+              <input id="client-search" type="search" placeholder="Buscar por nombre, telefono, documento o localidad">
+            </label>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Nombre</th>
+                  <th>Provincia</th>
+                  <th>Localidad</th>
+                  <th>Telefono</th>
+                  <th>Telefono 2</th>
+                  <th>DNI/CUIT</th>
+                  <th>Comentarios</th>
+                </tr>
+              </thead>
+              <tbody id="clients-body"></tbody>
+            </table>
+            <div class="empty-state" id="empty-clients">
+              <strong>No hay clientes cargados</strong>
+              <span>Agrega el primero para empezar a trabajar.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="equipment-view">
+          <div class="toolbar">
+            <label class="search-field">
+              <span>⌕</span>
+              <input id="equipment-search" type="search" placeholder="Buscar por cliente, tipo, marca, modelo o serie">
+            </label>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Cliente</th>
+                  <th>Tipo</th>
+                  <th>Marca</th>
+                  <th>Modelo</th>
+                  <th>Nro. serie</th>
+                  <th>Password</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody id="equipment-body"></tbody>
+            </table>
+            <div class="empty-state" id="empty-equipment">
+              <strong>No hay equipos cargados</strong>
+              <span>Registra equipos vinculados a tus clientes.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="products-view">
+          <div class="toolbar">
+            <label class="search-field">
+              <span>⌕</span>
+              <input id="product-search" type="search" placeholder="Buscar por tipo, marca, modelo o caracteristicas">
+            </label>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Tipo</th>
+                  <th>Marca</th>
+                  <th>Modelo</th>
+                  <th>Caracteristicas</th>
+                  <th>Costo</th>
+                  <th>Margen</th>
+                  <th>Precio final</th>
+                </tr>
+              </thead>
+              <tbody id="products-body"></tbody>
+            </table>
+            <div class="empty-state" id="empty-products">
+              <strong>No hay productos cargados</strong>
+              <span>Crea repuestos para usarlos en las ordenes de servicio.</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="view" id="services-view">
+          <div class="toolbar">
+            <label class="search-field">
+              <span>⌕</span>
+              <input id="service-search" type="search" placeholder="Buscar por cliente, equipo, estado o falla">
+            </label>
+          </div>
+
+          <div class="history-filter hidden" id="service-history-filter">
+            <span id="service-history-filter-text"></span>
+            <button class="small-button" type="button" id="clear-service-history-filter">Quitar filtro</button>
+          </div>
+
+          <div class="filter-strip" aria-label="Filtros por estado">
+            <label><input type="checkbox" id="filter-all" checked> Todos</label>
+            <label><input type="checkbox" class="service-filter" value="Sin revisar"> Sin ver</label>
+            <label><input type="checkbox" class="service-filter" value="Revisado"> Finalizado</label>
+            <label><input type="checkbox" class="service-filter" value="Entregado"> Entregado</label>
+            <label><input type="checkbox" class="service-filter" value="Cancelado"> Cancelado</label>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Estado</th>
+                  <th>Cliente</th>
+                  <th>Equipo</th>
+                  <th>Falla / Trabajo</th>
+                  <th>Repuestos</th>
+                  <th>Derivacion</th>
+                  <th>Ingreso</th>
+                  <th>Finalizado</th>
+                  <th>Entregado</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="services-body"></tbody>
+            </table>
+            <div class="empty-state" id="empty-services">
+              <strong>No hay servicios cargados</strong>
+              <span>Crea una orden para comenzar el seguimiento.</span>
+            </div>
+          </div>
+        </section>
+
+        <div class="service-action-menu" id="service-action-menu" aria-hidden="true"></div>
+        <div class="toast-stack" id="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+        <section class="view" id="settings-view">
+          <div class="settings-grid">
+            <section class="settings-section">
+              <div class="settings-section-heading">
+                <span class="panel-kicker">Productos</span>
+              </div>
+              <section class="panel">
+                <div class="panel-heading">
+                  <h2>Costo de transporte</h2>
+                </div>
+                <div class="inline-setting">
+                  <label>
+                    Costo
+                    <input id="transport-cost" inputmode="numeric">
+                  </label>
+                  <button class="primary-action" type="button" id="save-transport">Guardar</button>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-heading">
+                  <h2>Margenes por tipo</h2>
+                </div>
+                <div class="work-entry">
+                  <label>
+                    Tipo
+                    <input id="margin-type" list="settings-type-list">
+                    <datalist id="settings-type-list"></datalist>
+                  </label>
+                  <label>
+                    Margen %
+                    <input id="margin-percent" inputmode="numeric">
+                  </label>
+                  <button class="ghost-button" type="button" id="add-margin">Agregar</button>
+                </div>
+                <table class="mini-table">
+                  <thead>
+                    <tr>
+                      <th>Tipo</th>
+                      <th>Margen</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="margins-body"></tbody>
+                </table>
+              </section>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-heading">
+                <span class="panel-kicker">Servicios</span>
+              </div>
+              <section class="panel">
+                <div class="panel-heading">
+                  <h2>Trabajos frecuentes</h2>
+                </div>
+                <div class="work-entry">
+                  <label>
+                    Trabajo
+                    <input id="frequent-work-description">
+                  </label>
+                  <label>
+                    Precio
+                    <input id="frequent-work-price" inputmode="numeric">
+                  </label>
+                  <button class="ghost-button" type="button" id="add-frequent-work">Agregar</button>
+                </div>
+                <table class="mini-table">
+                  <thead>
+                    <tr>
+                      <th>Trabajo</th>
+                      <th>Precio</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="frequent-works-body"></tbody>
+                </table>
+              </section>
+            </section>
+
+            <section class="settings-section">
+              <div class="settings-section-heading">
+                <span class="panel-kicker">Clientes</span>
+              </div>
+              <section class="panel">
+                <div class="panel-heading">
+                  <h2>Mantenimiento</h2>
+                </div>
+                <div class="maintenance-action">
+                  <div>
+                    <strong>Clientes sin actividad</strong>
+                    <p id="orphan-clients-text">Calculando clientes sin equipos ni services asociados...</p>
+                  </div>
+                  <button class="danger-button" type="button" id="delete-orphan-clients">Eliminar</button>
+                </div>
+              </section>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="client-dialog" id="client-dialog">
+      <form method="dialog" id="client-form" autocomplete="off" novalidate>
+        <div class="dialog-banner">
+          <h2 id="dialog-title">Nuevo cliente</h2>
+          <button class="icon-button" type="button" id="close-dialog" aria-label="Cerrar">×</button>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            Nombre
+            <input id="client-name" name="name" autocomplete="off" required>
+          </label>
+          <label>
+            DNI/CUIT
+            <input id="client-document" name="document" inputmode="numeric" autocomplete="off">
+          </label>
+          <label>
+            Provincia
+            <input id="client-province" name="province" list="province-list" autocomplete="off" required>
+            <datalist id="province-list"></datalist>
+          </label>
+          <label>
+            Localidad
+            <input id="client-city" name="city" list="city-list" autocomplete="off" required>
+            <datalist id="city-list"></datalist>
+          </label>
+          <label>
+            Direccion
+            <input id="client-address" name="address" autocomplete="off">
+          </label>
+          <label>
+            Telefono 1
+            <input id="client-phone1" name="phone1" autocomplete="off">
+          </label>
+          <label>
+            Telefono 2
+            <input id="client-phone2" name="phone2" autocomplete="off">
+          </label>
+          <label class="span-2">
+            Comentarios
+            <textarea id="client-comments" name="comments" rows="3"></textarea>
+          </label>
+        </div>
+
+        <p class="form-error" id="form-error" role="alert"></p>
+
+        <div class="dialog-actions">
+          <button class="primary-action" type="submit" id="save-client">Aceptar</button>
+          <button class="danger-button" type="button" id="cancel-dialog">Cancelar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="client-dialog" id="equipment-dialog">
+      <form method="dialog" id="equipment-form" autocomplete="off" novalidate>
+        <div class="dialog-banner">
+          <h2 id="equipment-dialog-title">Nuevo equipo</h2>
+          <button class="icon-button" type="button" id="close-equipment-dialog" aria-label="Cerrar">×</button>
+        </div>
+
+        <div class="form-grid">
+          <div class="form-field span-2" id="equipment-client-wrap">
+            <label for="equipment-client">Cliente</label>
+            <input id="equipment-client" name="client" autocomplete="off" required>
+            <input id="equipment-client-id" name="clientId" type="hidden">
+            <div class="combo-menu" id="equipment-client-menu"></div>
+          </div>
+          <label>
+            Tipo
+            <select class="hidden-select" id="equipment-type" name="type" required>
+              <option value="">Seleccione...</option>
+              <option value="Telefono">Telefono</option>
+              <option value="Tablet">Tablet</option>
+              <option value="Notebook">Notebook</option>
+              <option value="CPU / PC">CPU / PC</option>
+              <option value="Monitor">Monitor</option>
+              <option value="Impresora">Impresora</option>
+              <option value="Otro">Otro</option>
+            </select>
+            <div class="icon-select" id="equipment-type-picker">
+              <button class="icon-select-trigger" type="button" id="equipment-type-trigger">Seleccione...</button>
+              <div class="icon-select-menu" id="equipment-type-menu"></div>
+            </div>
+          </label>
+          <label id="other-type-wrap" class="hidden">
+            Cual?
+            <input id="equipment-other-type" name="otherType" autocomplete="off">
+          </label>
+          <label>
+            Marca
+            <span class="suggest-field">
+              <input id="equipment-brand" name="brand" autocomplete="off" required>
+            </span>
+            <div class="combo-menu" id="equipment-brand-menu"></div>
+          </label>
+          <label>
+            Modelo
+            <span class="suggest-field">
+              <input id="equipment-model" name="model" autocomplete="off" required>
+            </span>
+            <div class="combo-menu" id="equipment-model-menu"></div>
+          </label>
+          <label>
+            Nro. serie
+            <input id="equipment-serial" name="serial" autocomplete="off">
+          </label>
+          <label>
+            Estado fisico
+            <input id="equipment-condition" name="condition" autocomplete="off">
+          </label>
+          <label id="password-wrap">
+            Password
+            <input id="equipment-password" name="password" autocomplete="off">
+          </label>
+          <div id="pattern-wrap" class="pattern-field">
+            <span>Patron de desbloqueo</span>
+            <div class="pattern-grid" id="pattern-grid" aria-label="Patron de desbloqueo">
+              <svg class="pattern-lines" id="pattern-lines" viewBox="0 0 230 230" aria-hidden="true"></svg>
+              <button type="button" data-dot="0"></button>
+              <button type="button" data-dot="1"></button>
+              <button type="button" data-dot="2"></button>
+              <button type="button" data-dot="3"></button>
+              <button type="button" data-dot="4"></button>
+              <button type="button" data-dot="5"></button>
+              <button type="button" data-dot="6"></button>
+              <button type="button" data-dot="7"></button>
+              <button type="button" data-dot="8"></button>
+            </div>
+            <button class="ghost-button compact" type="button" id="clear-pattern">Limpiar patron</button>
+          </div>
+        </div>
+
+        <p class="form-error" id="equipment-form-error" role="alert"></p>
+
+        <div class="dialog-actions">
+          <button class="primary-action" type="submit" id="save-equipment">Aceptar</button>
+          <button class="danger-button" type="button" id="cancel-equipment-dialog">Cancelar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="client-dialog wide-dialog" id="service-dialog">
+      <form method="dialog" id="service-form" autocomplete="off" novalidate>
+        <div class="dialog-banner">
+          <h2 id="service-dialog-title">Nuevo servicio</h2>
+          <button class="icon-button" type="button" id="close-service-dialog" aria-label="Cerrar">×</button>
+        </div>
+
+        <div class="service-tabs" role="tablist" aria-label="Secciones del servicio">
+          <button class="service-tab active" type="button" data-service-tab="service-client-tab">Cliente y Equipo</button>
+          <button class="service-tab" type="button" data-service-tab="service-diagnosis-tab">Falla o trabajo</button>
+          <button class="service-tab" type="button" data-service-tab="service-status-tab">Estado</button>
+          <button class="service-tab" type="button" data-service-tab="service-work-tab">Trabajos</button>
+          <button class="service-tab" type="button" data-service-tab="service-parts-tab">Repuestos</button>
+          <button class="service-tab" type="button" data-service-tab="service-derived-tab">Derivacion</button>
+          <button class="service-tab" type="button" data-service-tab="service-summary-tab">Resumen</button>
+        </div>
+
+        <section class="service-tab-panel active" id="service-client-tab">
+          <div class="form-grid">
+          <label class="field-with-action span-2">
+            Cliente
+            <input id="service-client" name="client" autocomplete="off" required>
+            <datalist id="service-client-list"></datalist>
+            <div class="combo-menu" id="service-client-menu"></div>
+            <button class="ghost-button field-action" type="button" id="quick-new-client">Nuevo</button>
+            <button class="ghost-button field-action field-action-secondary" type="button" id="quick-edit-client">Editar</button>
+          </label>
+          <label class="field-with-action span-2">
+            Equipo
+            <select class="hidden-select" id="service-equipment" name="equipment" required></select>
+            <div class="icon-select" id="service-equipment-picker">
+              <button class="icon-select-trigger" type="button" id="service-equipment-trigger">Sin equipos cargados</button>
+              <div class="icon-select-menu" id="service-equipment-menu"></div>
+            </div>
+            <button class="ghost-button field-action" type="button" id="quick-new-equipment">Nuevo</button>
+            <button class="ghost-button field-action field-action-secondary" type="button" id="quick-edit-equipment">Editar</button>
+          </label>
+          <p class="inline-warning span-2 hidden" id="service-no-equipment">
+            El cliente actual no posee ningun equipo cargado, cargue uno nuevo para continuar.
+          </p>
+          <label class="span-2">
+            Accesorios
+            <input id="service-accessories" name="accessories" autocomplete="off">
+          </label>
+          </div>
+        </section>
+
+        <section class="service-tab-panel" id="service-diagnosis-tab">
+          <div class="service-workbench">
+            <input id="service-failure" name="failure" type="hidden">
+            <div class="service-entry-group">
+              <div class="service-entry-title">Problemas o fallas del equipo</div>
+              <table class="mini-table">
+                <thead>
+                  <tr>
+                    <th>Falla</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="service-issues-body"></tbody>
+              </table>
+              <div class="work-entry">
+                <label>
+                  Falla reportada
+                  <input id="issue-description" autocomplete="off">
+                </label>
+                <button class="ghost-button" type="button" id="add-issue">Agregar</button>
+              </div>
+            </div>
+            <div class="service-entry-group">
+              <div class="service-entry-title">Trabajos a realizar</div>
+              <table class="mini-table">
+                <thead>
+                  <tr>
+                    <th>Trabajo a realizar</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="requested-works-body"></tbody>
+              </table>
+              <div class="work-entry">
+                <label>
+                  Trabajo solicitado
+                  <input id="requested-work-description" autocomplete="off">
+                </label>
+                <button class="ghost-button" type="button" id="add-requested-work">Agregar</button>
+              </div>
+            </div>
+          </div>
+          <div class="form-grid">
+            <label class="span-2">
+              Diagnostico
+              <textarea id="service-diagnosis" name="diagnosis" rows="2"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="service-tab-panel" id="service-status-tab">
+          <div class="form-grid">
+            <label class="span-2">
+              Estado
+              <span class="select-shell">
+                <select id="service-status" name="status">
+                  <option value="Sin revisar">Sin ver</option>
+                  <option value="Revisado">Finalizado</option>
+                  <option>Entregado</option>
+                  <option>Cancelado</option>
+                </select>
+              </span>
+            </label>
+          </div>
+        </section>
+
+        <section class="service-tab-panel" id="service-work-tab">
+          <div class="service-workbench">
+          <table class="mini-table">
+            <thead>
+              <tr>
+                <th>Trabajo realizado</th>
+                <th>Hecho</th>
+                <th>Comentario / motivo</th>
+                <th>Precio</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="service-works-body"></tbody>
+          </table>
+          <div class="work-entry">
+            <label>
+              Trabajo extra
+              <input id="work-description" list="frequent-work-list" autocomplete="off">
+              <datalist id="frequent-work-list"></datalist>
+            </label>
+            <label>
+              Precio
+              <input id="work-price" inputmode="numeric" autocomplete="off">
+            </label>
+            <label>
+              Comentario
+              <input id="work-note" autocomplete="off">
+            </label>
+            <button class="ghost-button" type="button" id="add-work">Agregar</button>
+            <button class="ghost-button" type="button" id="save-work-preset">Agregar a predeterminado</button>
+          </div>
+          </div>
+        </section>
+
+        <section class="service-tab-panel" id="service-parts-tab">
+          <div class="service-workbench">
+          <table class="mini-table">
+            <thead>
+              <tr>
+                <th>Repuesto</th>
+                <th>Cant.</th>
+                <th>Subtotal</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="service-parts-body"></tbody>
+          </table>
+          <div class="work-entry">
+            <label>
+              Repuesto
+              <input id="part-product" list="part-product-list" autocomplete="off">
+              <datalist id="part-product-list"></datalist>
+            </label>
+            <label>
+              Cantidad
+              <input id="part-quantity" inputmode="numeric" placeholder="1" autocomplete="off">
+            </label>
+            <button class="ghost-button" type="button" id="add-part">Agregar</button>
+            <span class="action-separator" aria-hidden="true"></span>
+            <button class="ghost-button" type="button" id="quick-new-part">Nuevo</button>
+            <button class="ghost-button" type="button" id="quick-edit-part">Editar</button>
+          </div>
+          </div>
+        </section>
+
+        <section class="service-tab-panel" id="service-derived-tab">
+          <div class="service-workbench">
+          <table class="mini-table">
+            <thead>
+              <tr>
+                <th>Tecnico</th>
+                <th>Trabajo</th>
+                <th>Precio</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="external-works-body"></tbody>
+          </table>
+          <div class="service-total">
+            <label>
+              Tecnico / tercero
+              <input id="service-derived" autocomplete="off">
+            </label>
+            <label>
+              Trabajo derivado
+              <input id="external-work" autocomplete="off">
+            </label>
+            <label>
+              Precio
+              <input id="external-cost" inputmode="numeric" autocomplete="off">
+            </label>
+            <button class="ghost-button" type="button" id="add-external-work">Agregar</button>
+          </div>
+          </div>
+        </section>
+
+        <section class="service-tab-panel" id="service-summary-tab">
+          <div class="service-workbench">
+            <table class="mini-table">
+              <thead>
+                <tr>
+                  <th>Concepto</th>
+                  <th>Detalle</th>
+                  <th>Cant.</th>
+                  <th>Subtotal</th>
+                </tr>
+              </thead>
+              <tbody id="service-summary-body"></tbody>
+            </table>
+            <div class="service-total total-only summary-total">
+              <label class="total-label">
+                Total general
+                <strong id="service-total">$ 0</strong>
+              </label>
+            </div>
+          </div>
+        </section>
+
+        <p class="form-error" id="service-form-error" role="alert"></p>
+
+        <div class="dialog-actions">
+          <button class="primary-action" type="submit" id="save-service">Aceptar</button>
+          <button class="danger-button" type="button" id="cancel-service-dialog">Cancelar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="client-dialog" id="product-dialog">
+      <form method="dialog" id="product-form" autocomplete="off" novalidate>
+        <div class="dialog-banner">
+          <h2 id="product-dialog-title">Nuevo producto</h2>
+          <button class="icon-button" type="button" id="close-product-dialog" aria-label="Cerrar">×</button>
+        </div>
+
+        <div class="form-grid">
+          <label>
+            Tipo
+            <span class="suggest-field">
+              <input id="product-type" name="type" autocomplete="off" required>
+            </span>
+            <div class="combo-menu" id="product-type-menu"></div>
+          </label>
+          <label>
+            Marca
+            <span class="suggest-field">
+              <input id="product-brand" name="brand" autocomplete="off" required>
+            </span>
+            <div class="combo-menu" id="product-brand-menu"></div>
+          </label>
+          <label>
+            Modelo
+            <span class="suggest-field">
+              <input id="product-model" name="model" autocomplete="off" required>
+            </span>
+            <div class="combo-menu" id="product-model-menu"></div>
+          </label>
+          <label>
+            Costo
+            <input id="product-cost" name="cost" inputmode="numeric" autocomplete="off">
+          </label>
+          <label>
+            Margen %
+            <input id="product-margin" name="margin" inputmode="numeric" autocomplete="off">
+          </label>
+          <label>
+            Precio final
+            <input id="product-final-price" readonly>
+          </label>
+          <label class="span-2">
+            Caracteristicas
+            <input id="product-features" name="features" autocomplete="off">
+          </label>
+        </div>
+
+        <p class="form-error" id="product-form-error" role="alert"></p>
+
+        <div class="dialog-actions">
+          <button class="primary-action" type="submit" id="save-product">Aceptar</button>
+          <button class="danger-button" type="button" id="cancel-product-dialog">Cancelar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="message-dialog" id="message-dialog">
+      <div class="dialog-banner" id="message-banner">
+        <h2 id="message-title">Mensaje</h2>
+        <button class="icon-button" type="button" id="message-close" aria-label="Cerrar">×</button>
+      </div>
+      <div class="message-content">
+        <span class="message-icon" id="message-icon"></span>
+        <p id="message-text"></p>
+      </div>
+      <div class="dialog-actions" id="message-actions"></div>
+    </dialog>
+
+    <template id="activity-template">
+      <div class="timeline-item">
+        <span></span>
+        <p></p>
+      </div>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

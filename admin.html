@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Administrador - Sistema de Services</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="admin-page">
+    <main class="admin-shell">
+      <header class="admin-header">
+        <div>
+          <p class="eyebrow">Sistema web</p>
+          <h1>Panel administrador</h1>
+        </div>
+        <div class="admin-actions">
+          <button class="ghost-button" type="button" id="admin-open-app">Ir a mi sistema</button>
+          <button class="danger-button" type="button" id="admin-logout">Salir</button>
+        </div>
+      </header>
+
+      <section class="panel admin-panel">
+        <div class="panel-heading">
+          <h2>Usuarios registrados</h2>
+          <button class="ghost-button" type="button" id="admin-refresh">Actualizar</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Email</th>
+                <th>Alta</th>
+                <th>Datos</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="admin-users-body"></tbody>
+          </table>
+          <div class="empty-state" id="admin-empty">
+            <strong>No hay usuarios registrados</strong>
+            <p>Cuando alguien cree una cuenta, va a aparecer en este panel.</p>
+          </div>
+        </div>
+      </section>
+      <p class="auth-error" id="admin-error"></p>
+    </main>
+    <script src="admin.js"></script>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "clients": [],
+  "equipment": [],
+  "products": [],
+  "services": [],
+  "settings": {
+    "transportCost": 0,
+    "margins": [],
+    "frequentWorks": [],
+    "serviceFilters": {
+      "all": true,
+      "statuses": []
+    }
+  }
+}
