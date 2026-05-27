@@ -1125,6 +1125,20 @@ function renderServiceFilterControls() {
   els.serviceFilters.forEach((filter) => {
     filter.checked = !els.filterAll.checked && filters.statuses.includes(filter.value);
   });
+
+  const counts = {
+    "Sin revisar": countServicesByStatus("Sin revisar"),
+    "Revision demorada": countServicesByStatus("Revision demorada"),
+    Revisado: countServicesByStatus("Revisado"),
+    "Retiro demorado": countServicesByStatus("Retiro demorado"),
+    Entregado: countServicesByStatus("Entregado"),
+    Cancelado: countServicesByStatus("Cancelado"),
+  };
+
+  document.querySelectorAll("[data-filter-count]").forEach((element) => {
+    const status = element.dataset.filterCount;
+    element.textContent = `(${counts[status] || 0})`;
+  });
 }
 
 function renderServiceHistoryFilter() {
