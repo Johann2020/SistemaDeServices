@@ -1090,8 +1090,8 @@ function renderServices() {
       <td class="tooltip-cell" data-tooltip="${escapeHtml(partsSummary)}"><span class="cell-ellipsis">${escapeHtml(partsSummary || "---")}</span></td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(derivationSummary)}"><span class="cell-ellipsis">${escapeHtml(derivationSummary || "---")}</span></td>
       <td>${dateWithAgeHtml(service.entryDate)}</td>
-      <td>${dateWithAgeHtml(service.finishDate)}</td>
-      <td>${dateWithAgeHtml(service.deliveryDate)}</td>
+      <td>${dateWithAgeHtml(service.finishDate, { tooltip: serviceFinalizedTooltip(service) })}</td>
+      <td>${dateWithAgeHtml(service.deliveryDate, { tooltip: serviceDeliveredTooltip(service) })}</td>
       <td><strong>${money(service.total)}</strong></td>
     `;
     markSelectedRow("services", service.id, tr);
@@ -3895,6 +3895,75 @@ function compareServicesByStatus(a, b) {
   const rankDiff = serviceStatusRank(a.status) - serviceStatusRank(b.status);
   if (rankDiff !== 0) return rankDiff;
   return Number(b.id || 0) - Number(a.id || 0);
+}
+
+function elapsedFrom(value) {
+  return elapsedPartsText(elapsedPartsSince(value));
+}
+
+function elapsedBetween(startValue, endValue) {
+  return elapsedPartsText(elapsedPartsBetween(startValue, endValue));
+}
+
+function elapsedPartsSince(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return [];
+  return elapsedPartsFromDays(Math.floor(Math.max(0, Date.now() - date.getTime()) / 86400000));
+}
+
+function elapsedPartsBetween(startValue, endValue) {
+  const start = new Date(startValue);
+  const end = new Date(endValue);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return [];
+  return elapsedPartsFromDays(Math.floor(Math.max(0, end.getTime() - start.getTime()) / 86400000));
+}
+
+function elapsedPartsFromDays(days) {
+  if (!Number.isFinite(days) || days < 1) return [];
+  const years = Math.floor(days / 365);
+  const remainingAfterYears = days % 365;
+  const months = Math.floor(remainingAfterYears / 30);
+  const remainingDays = remainingAfterYears % 30;
+  const parts = [];
+  if (years > 0) parts.push(`${years} a\u00f1o${years === 1 ? "" : "s"}`);
+  if (months > 0) parts.push(`${months} mes${months === 1 ? "" : "es"}`);
+  if (remainingDays > 0) parts.push(`${remainingDays} dia${remainingDays === 1 ? "" : "s"}`);
+  return parts;
+}
+
+function elapsedPartsText(parts) {
+  if (!parts || parts.length === 0) return "Hoy";
+  return parts.join(" y ");
+}
+
+function dateWithAgeHtml(value, options = {}) {
+  if (!value) return "---";
+  const tooltip = options.tooltip ? ` title="${escapeHtml(options.tooltip)}"` : "";
+  return `
+    <span class="date-age"${tooltip}>
+      <strong>${escapeHtml(formatDate(value))}</strong>
+      <span>${escapeHtml(elapsedFrom(value))}</span>
+    </span>
+  `;
+}
+
+function serviceFinalizedTooltip(service) {
+  if (!service?.entryDate || !service?.finishDate) return "";
+  return `Ingreso -> Finalizado: ${elapsedBetween(service.entryDate, service.finishDate)}`;
+}
+
+function serviceDeliveredTooltip(service) {
+  const entries = [];
+  if (service?.entryDate && service?.finishDate) {
+    entries.push(`Ingreso -> Finalizado: ${elapsedBetween(service.entryDate, service.finishDate)}`);
+  }
+  if (service?.finishDate && service?.deliveryDate) {
+    entries.push(`Finalizado -> Entregado: ${elapsedBetween(service.finishDate, service.deliveryDate)}`);
+  }
+  if (service?.entryDate && service?.deliveryDate) {
+    entries.push(`Ingreso -> Entregado: ${elapsedBetween(service.entryDate, service.deliveryDate)}`);
+  }
+  return entries.join("\n");
 }
 
 function nextClientId() {
