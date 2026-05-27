@@ -27,6 +27,7 @@ const state = {
   currentUser: null,
   adminUser: null,
   impersonating: false,
+  csrfToken: "",
   provinces: [],
   cities: [],
   offlineGeo: false,
@@ -685,6 +686,7 @@ async function initializeRemoteState() {
     state.currentUser = session.user;
     state.adminUser = session.admin;
     state.impersonating = Boolean(session.impersonating);
+    state.csrfToken = session.csrfToken || "";
     state.clients = Array.isArray(remote.clients) ? remote.clients : [];
     state.equipment = Array.isArray(remote.equipment) ? remote.equipment : [];
     state.products = Array.isArray(remote.products) ? remote.products : [];
@@ -696,11 +698,13 @@ async function initializeRemoteState() {
 }
 
 async function fetchJson(url, options = {}) {
+  const method = String(options.method || "GET").toUpperCase();
   const response = await fetch(url, {
     credentials: "same-origin",
     ...options,
     headers: {
       "Content-Type": "application/json",
+      ...(method !== "GET" && state.csrfToken ? { "X-CSRF-Token": state.csrfToken } : {}),
       ...(options.headers || {}),
     },
   });
@@ -835,7 +839,10 @@ function persistRemote(bucket, value) {
   fetch(`/api/state/${bucket}`, {
     method: "PUT",
     credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(state.csrfToken ? { "X-CSRF-Token": state.csrfToken } : {}),
+    },
     body: JSON.stringify(value),
   }).catch(() => {
     showToast("No se pudo sincronizar con la nube", { type: "error" });
@@ -2495,9 +2502,15 @@ function validateService(data) {
   if (!data.equipmentId) {
     return { ok: false, message: "Debe seleccionar un equipo.", field: els.serviceFields.equipment };
   }
-  if (!data.failure) {
+  const hasFailure = state.serviceIssues.length > 0;
+  const hasRequestedWork = data.works.some((work) => work.source === "requested" && work.description);
+  if (!hasFailure && !hasRequestedWork) {
     showServiceTab("service-diagnosis-tab");
-    return { ok: false, message: "Debe ingresar al menos una falla reportada.", field: els.serviceFields.issueDescription };
+    return {
+      ok: false,
+      message: "Debe ingresar al menos una falla o un trabajo a realizar.",
+      field: els.serviceFields.issueDescription,
+    };
   }
   return { ok: true };
 }
