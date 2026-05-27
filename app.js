@@ -3902,7 +3902,7 @@ function elapsedFrom(value) {
 }
 
 function elapsedBetween(startValue, endValue) {
-  return elapsedPartsText(elapsedPartsBetween(startValue, endValue));
+  return elapsedPartsText(elapsedPartsBetween(startValue, endValue), "0 dias");
 }
 
 function elapsedPartsSince(value) {
@@ -3931,8 +3931,8 @@ function elapsedPartsFromDays(days) {
   return parts;
 }
 
-function elapsedPartsText(parts) {
-  if (!parts || parts.length === 0) return "Hoy";
+function elapsedPartsText(parts, zeroText = "Hoy") {
+  if (!parts || parts.length === 0) return zeroText;
   return parts.join(" y ");
 }
 
