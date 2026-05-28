@@ -1226,9 +1226,24 @@ function mergeStateItems(type, items) {
   if (!Array.isArray(state[stateKey]) || !Array.isArray(items)) return;
   const byId = mapById(state[stateKey]);
   items.forEach((item) => {
-    if (item?.id) byId.set(Number(item.id), item);
+    if (!item?.id) return;
+    const id = Number(item.id);
+    byId.set(id, mergeCompleteRecord(byId.get(id), item));
   });
   state[stateKey] = [...byId.values()];
+}
+
+function mergeCompleteRecord(base, incoming) {
+  if (!base) return incoming;
+  const merged = { ...base, ...incoming };
+  Object.keys(merged).forEach((key) => {
+    const incomingValue = incoming?.[key];
+    const baseValue = base?.[key];
+    const incomingEmpty = incomingValue === "" || incomingValue === null || typeof incomingValue === "undefined";
+    const baseHasValue = !(baseValue === "" || baseValue === null || typeof baseValue === "undefined");
+    if (incomingEmpty && baseHasValue) merged[key] = baseValue;
+  });
+  return merged;
 }
 
 function visiblePageItem(type, id) {
@@ -1240,6 +1255,12 @@ function getServiceRecord(id) {
   return visiblePageItem("services", id) ||
     state.services.find((service) => Number(service.id) === Number(id)) ||
     null;
+}
+
+function getClientRecord(id) {
+  const visible = visiblePageItem("clients", id);
+  const stored = state.clients.find((client) => Number(client.id) === Number(id));
+  return mergeCompleteRecord(stored, visible);
 }
 
 function upsertStateItem(type, item) {
@@ -1648,8 +1669,21 @@ function renderServiceFilterControls() {
 
   document.querySelectorAll("[data-filter-count]").forEach((element) => {
     const status = element.dataset.filterCount;
-    element.textContent = `(${counts[status] || 0})`;
+    const count = Number(counts[status] || 0);
+    const label = element.closest("label");
+    const input = label?.querySelector("input");
+    if (label) label.classList.toggle("hidden", count === 0);
+    if (count === 0 && input?.checked) input.checked = false;
+    element.textContent = `(${count})`;
   });
+
+  const visibleChecked = els.serviceFilters.filter((filter) =>
+    filter.checked && !filter.closest("label")?.classList.contains("hidden")
+  );
+  if (!els.filterAll.checked && visibleChecked.length === 0) {
+    state.settings.serviceFilters = { all: true, statuses: [] };
+    els.filterAll.checked = true;
+  }
 }
 
 function renderServiceHistoryFilter() {
@@ -2737,7 +2771,8 @@ function renderClients() {
   const pageData = paginateItems("clients", filtered);
 
   els.tbody.innerHTML = "";
-  pageData.items.forEach((client) => {
+  pageData.items.forEach((pageClient) => {
+    const client = getClientRecord(pageClient.id) || pageClient;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(client.id)}</td>
@@ -4360,7 +4395,7 @@ function equipmentTypeToOption(type) {
 }
 
 function getClientById(id) {
-  return state.clients.find((client) => client.id === Number(id));
+  return getClientRecord(id);
 }
 
 function getEquipmentById(id) {

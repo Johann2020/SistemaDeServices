@@ -1673,30 +1673,6 @@ tbody tr.work-pending {
   opacity: 0.82;
 }
 
-.filter-strip label:has(input[value="Sin revisar"]) {
-  background: #fff4df;
-}
-
-.filter-strip label:has(input[value="Revisado"]) {
-  background: #e9f6ed;
-}
-
-.filter-strip label:has(input[value="Revision demorada"]) {
-  background: #ffe7bc;
-}
-
-.filter-strip label:has(input[value="Retiro demorado"]) {
-  background: #dff0e6;
-}
-
-.filter-strip label:has(input[value="Entregado"]) {
-  background: #e7f3f8;
-}
-
-.filter-strip label:has(input[value="Cancelado"]) {
-  background: #fff0f0;
-}
-
 .pattern-field {
   display: grid;
   gap: 10px;
