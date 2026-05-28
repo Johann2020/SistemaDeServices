@@ -262,6 +262,35 @@ def read_tenant_state(user_id):
     return state
 
 
+def read_tenant_lookup_state(user_id):
+    state = default_state()
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT data FROM tenant_data WHERE user_id = ? AND bucket = 'settings'",
+            (user_id,),
+        ).fetchone()
+        if row:
+            try:
+                state["settings"] = json.loads(row["data"])
+            except json.JSONDecodeError:
+                pass
+        rows = conn.execute(
+            """
+            SELECT bucket, data
+            FROM tenant_items
+            WHERE user_id = ? AND bucket IN ('clients', 'equipment', 'products')
+            ORDER BY bucket, item_id
+            """,
+            (user_id,),
+        ).fetchall()
+    for row in rows:
+        try:
+            state[row["bucket"]].append(json.loads(row["data"]))
+        except json.JSONDecodeError:
+            pass
+    return state
+
+
 def write_bucket(user_id, bucket, value):
     with connect() as conn:
         conn.execute(
@@ -274,6 +303,139 @@ def write_bucket(user_id, bucket, value):
             (user_id, bucket, json.dumps(value, ensure_ascii=False)),
         )
         sync_bucket_items(conn, user_id, bucket, value)
+
+
+def read_bucket_list(conn, user_id, bucket):
+    row = conn.execute(
+        "SELECT data FROM tenant_data WHERE user_id = ? AND bucket = ?",
+        (user_id, bucket),
+    ).fetchone()
+    if not row:
+        return []
+    try:
+        value = json.loads(row["data"])
+    except json.JSONDecodeError:
+        return []
+    return value if isinstance(value, list) else []
+
+
+def write_bucket_list(conn, user_id, bucket, value):
+    conn.execute(
+        """
+        INSERT INTO tenant_data (user_id, bucket, data, updated_at)
+        VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id, bucket)
+        DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+        """,
+        (user_id, bucket, json.dumps(value, ensure_ascii=False)),
+    )
+
+
+def write_item(user_id, bucket, item_id_value, value):
+    if bucket not in ITEM_BUCKETS or not isinstance(value, dict):
+        raise PublicError("Dato no valido.")
+    try:
+        item_id_number = int(item_id_value)
+    except (TypeError, ValueError):
+        raise PublicError("ID no valido.")
+    value["id"] = item_id_number
+
+    with connect() as conn:
+        items = read_bucket_list(conn, user_id, bucket)
+        replaced = False
+        for index, item in enumerate(items):
+            if item_id(item) == item_id_number:
+                items[index] = value
+                replaced = True
+                break
+        if not replaced:
+            items.append(value)
+        write_bucket_list(conn, user_id, bucket, items)
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO tenant_items (user_id, bucket, item_id, data, search_text, updated_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (user_id, bucket, item_id_number, json.dumps(value, ensure_ascii=False), item_search_text(value)),
+        )
+
+
+def create_item(user_id, bucket, value):
+    if bucket not in ITEM_BUCKETS or not isinstance(value, dict):
+        raise PublicError("Dato no valido.")
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT COALESCE(MAX(item_id), 0) + 1 AS next_id FROM tenant_items WHERE user_id = ? AND bucket = ?",
+            (user_id, bucket),
+        ).fetchone()
+        next_id = int(row["next_id"])
+        value["id"] = next_id
+        items = read_bucket_list(conn, user_id, bucket)
+        items.append(value)
+        write_bucket_list(conn, user_id, bucket, items)
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO tenant_items (user_id, bucket, item_id, data, search_text, updated_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            """,
+            (user_id, bucket, next_id, json.dumps(value, ensure_ascii=False), item_search_text(value)),
+        )
+    return value
+
+
+def delete_item(user_id, bucket, item_id_value):
+    if bucket not in ITEM_BUCKETS:
+        raise PublicError("Dato no valido.")
+    try:
+        item_id_number = int(item_id_value)
+    except (TypeError, ValueError):
+        raise PublicError("ID no valido.")
+
+    with connect() as conn:
+        items = [item for item in read_bucket_list(conn, user_id, bucket) if item_id(item) != item_id_number]
+        write_bucket_list(conn, user_id, bucket, items)
+        conn.execute(
+            "DELETE FROM tenant_items WHERE user_id = ? AND bucket = ? AND item_id = ?",
+            (user_id, bucket, item_id_number),
+        )
+
+
+def read_item(conn, user_id, bucket, item_id_value):
+    try:
+        row_id = int(item_id_value)
+    except (TypeError, ValueError):
+        return None
+    row = conn.execute(
+        """
+        SELECT data
+        FROM tenant_items
+        WHERE user_id = ? AND bucket = ? AND item_id = ?
+        """,
+        (user_id, bucket, row_id),
+    ).fetchone()
+    if not row:
+        return None
+    try:
+        return json.loads(row["data"])
+    except json.JSONDecodeError:
+        return None
+
+
+def enrich_page_items(conn, user_id, bucket, items):
+    if bucket not in {"equipment", "services"}:
+        return items
+    enriched = []
+    for item in items:
+        if not isinstance(item, dict):
+            enriched.append(item)
+            continue
+        copy = dict(item)
+        if bucket in {"equipment", "services"}:
+            copy["_client"] = read_item(conn, user_id, "clients", copy.get("clientId"))
+        if bucket == "services":
+            copy["_equipment"] = read_item(conn, user_id, "equipment", copy.get("equipmentId"))
+        enriched.append(copy)
+    return enriched
 
 
 def read_items_page(user_id, bucket, params):
@@ -333,11 +495,20 @@ def read_items_page(user_id, bucket, params):
 
     if bucket == "services":
         status = str(params.get("status", [""])[0]).strip()
+        statuses = [
+            value.strip()
+            for value in str(params.get("statuses", [""])[0]).split(",")
+            if value.strip()
+        ]
         client_id = str(params.get("clientId", [""])[0]).strip()
         equipment_id = str(params.get("equipmentId", [""])[0]).strip()
         if status:
             where.append("json_extract(data, '$.status') = ?")
             values.append(status)
+        elif statuses:
+            placeholders = ", ".join("?" for _ in statuses)
+            where.append(f"json_extract(data, '$.status') IN ({placeholders})")
+            values.extend(statuses)
         if client_id:
             where.append("CAST(json_extract(data, '$.clientId') AS TEXT) = ?")
             values.append(client_id)
@@ -384,6 +555,8 @@ def read_items_page(user_id, bucket, params):
             items.append(json.loads(row["data"]))
         except json.JSONDecodeError:
             pass
+    with connect() as conn:
+        items = enrich_page_items(conn, user_id, bucket, items)
     pages = max(1, (total + page_size - 1) // page_size)
     return {
         "items": items,
@@ -411,6 +584,66 @@ def tenant_item_counts(user_id):
     return counts
 
 
+def dashboard_summary(user_id):
+    counts = tenant_item_counts(user_id)
+    status_counts = {
+        "Sin revisar": 0,
+        "Revision demorada": 0,
+        "Revisado": 0,
+        "Retiro demorado": 0,
+        "Entregado": 0,
+        "Cancelado": 0,
+    }
+    recent = []
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT data
+            FROM tenant_items
+            WHERE user_id = ? AND bucket = 'services'
+            """,
+            (user_id,),
+        ).fetchall()
+        clients = {
+            row["item_id"]: json.loads(row["data"])
+            for row in conn.execute(
+                "SELECT item_id, data FROM tenant_items WHERE user_id = ? AND bucket = 'clients'",
+                (user_id,),
+            ).fetchall()
+        }
+
+    for row in rows:
+        try:
+            service = json.loads(row["data"])
+        except json.JSONDecodeError:
+            continue
+        status = service.get("status") or ""
+        if status in status_counts:
+            status_counts[status] += 1
+        client = clients.get(int(service.get("clientId") or 0), {})
+        recent.append({
+            "date": service.get("entryDate"),
+            "text": f"Servicio #{service.get('id')}: {client.get('name') or 'Sin cliente'} - {status}",
+        })
+
+    for client in clients.values():
+        recent.append({
+            "date": client.get("createdAt"),
+            "text": f"Cliente registrado: {client.get('name') or 'Sin nombre'}",
+        })
+
+    recent.sort(key=lambda item: item.get("date") or "", reverse=True)
+    return {
+        "counts": counts,
+        "openServices": sum(
+            total for status, total in status_counts.items()
+            if status not in {"Entregado", "Cancelado"}
+        ),
+        "statusCounts": status_counts,
+        "recentActivity": recent[:6],
+    }
+
+
 def is_render_environment():
     return any(key.startswith("RENDER") for key in os.environ)
 
@@ -430,13 +663,16 @@ class ServicesHandler(BaseHTTPRequestHandler):
     def do_PUT(self):
         self.handle_api()
 
+    def do_DELETE(self):
+        self.handle_api()
+
     def handle_api(self):
         try:
             parsed_url = urlparse(self.path)
             path = parsed_url.path
             params = parse_qs(parsed_url.query)
 
-            if self.command in {"POST", "PUT"} and (self.command, path) not in CSRF_EXEMPT:
+            if self.command in {"POST", "PUT", "DELETE"} and (self.command, path) not in CSRF_EXEMPT:
                 if not self.valid_csrf_token():
                     self.send_json(403, {"error": "La sesion no pudo validarse. Recargue la pagina e intente nuevamente."})
                     return
@@ -491,13 +727,43 @@ class ServicesHandler(BaseHTTPRequestHandler):
                 return
 
             if self.command == "GET" and path == "/api/state":
-                self.send_json(200, read_tenant_state(user["id"]))
+                if params.get("lookups", ["0"])[0] in {"1", "true", "yes"}:
+                    self.send_json(200, read_tenant_lookup_state(user["id"]))
+                else:
+                    self.send_json(200, read_tenant_state(user["id"]))
+                return
+
+            if self.command == "GET" and path == "/api/dashboard":
+                self.send_json(200, dashboard_summary(user["id"]))
                 return
 
             if self.command == "GET" and path.startswith("/api/items/"):
                 bucket = path.rsplit("/", 1)[-1]
                 self.send_json(200, read_items_page(user["id"], bucket, params))
                 return
+
+            if path.startswith("/api/item/"):
+                parts = path.strip("/").split("/")
+                if len(parts) not in {3, 4}:
+                    self.send_json(404, {"error": "Ruta no encontrada."})
+                    return
+                _, _, bucket, *rest = parts
+                if self.command == "POST" and not rest:
+                    item = create_item(user["id"], bucket, self.read_json())
+                    self.send_json(201, {"ok": True, "item": item})
+                    return
+                if not rest:
+                    self.send_json(404, {"error": "Ruta no encontrada."})
+                    return
+                item_id_value = rest[0]
+                if self.command == "PUT":
+                    write_item(user["id"], bucket, item_id_value, self.read_json())
+                    self.send_json(200, {"ok": True})
+                    return
+                if self.command == "DELETE":
+                    delete_item(user["id"], bucket, item_id_value)
+                    self.send_json(200, {"ok": True})
+                    return
 
             if self.command == "PUT" and path.startswith("/api/state/"):
                 bucket = path.rsplit("/", 1)[-1]

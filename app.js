@@ -934,6 +934,77 @@ function persistRemote(bucket, value) {
   });
 }
 
+function cleanPersistItem(item) {
+  return Object.fromEntries(
+    Object.entries(item || {}).filter(([key]) => !key.startsWith("_"))
+  );
+}
+
+function createRemoteItem(bucket, item) {
+  clearRemotePage(bucket);
+  state.dashboard = null;
+  return fetch(`/api/item/${bucket}`, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      ...(state.csrfToken ? { "X-CSRF-Token": state.csrfToken } : {}),
+    },
+    body: JSON.stringify(cleanPersistItem(item)),
+  })
+    .then(async (response) => {
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo sincronizar con la nube");
+      await refreshDashboard();
+      return data.item;
+    })
+    .catch((error) => {
+      showToast(error.message || "No se pudo sincronizar con la nube", { type: "error" });
+      return null;
+    });
+}
+
+function persistRemoteItem(bucket, item) {
+  if (!item?.id) return Promise.resolve();
+  clearRemotePage(bucket);
+  state.dashboard = null;
+  return fetch(`/api/item/${bucket}/${encodeURIComponent(item.id)}`, {
+    method: "PUT",
+    credentials: "same-origin",
+    headers: {
+      "Content-Type": "application/json",
+      ...(state.csrfToken ? { "X-CSRF-Token": state.csrfToken } : {}),
+    },
+    body: JSON.stringify(cleanPersistItem(item)),
+  })
+    .then((response) => {
+      if (!response.ok) throw new Error("No se pudo sincronizar con la nube");
+      return refreshDashboard();
+    })
+    .catch(() => {
+      showToast("No se pudo sincronizar con la nube", { type: "error" });
+    });
+}
+
+function deleteRemoteItem(bucket, id) {
+  clearRemotePage(bucket);
+  state.dashboard = null;
+  return fetch(`/api/item/${bucket}/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    credentials: "same-origin",
+    headers: {
+      ...(state.csrfToken ? { "X-CSRF-Token": state.csrfToken } : {}),
+    },
+  })
+    .then((response) => {
+      if (!response.ok) throw new Error("No se pudo sincronizar con la nube");
+      return refreshDashboard();
+    })
+    .catch(() => {
+      showToast("No se pudo sincronizar con la nube", { type: "error" });
+    });
+}
+
 async function refreshDashboard() {
   if (!state.remoteEnabled) return;
   try {
@@ -1040,7 +1111,7 @@ function remotePageConfig(type) {
     if (statuses.length === 1) {
       params.set("status", statuses[0]);
     } else if (statuses.length > 1) {
-      return null;
+      params.set("statuses", statuses.join(","));
     }
   }
 
@@ -1100,6 +1171,44 @@ function mergeStateItems(type, items) {
     if (item?.id) byId.set(Number(item.id), item);
   });
   state[stateKey] = [...byId.values()];
+}
+
+function visiblePageItem(type, id) {
+  const page = state.remotePages[type];
+  return page?.items?.find((item) => Number(item.id) === Number(id)) || null;
+}
+
+function getServiceRecord(id) {
+  return visiblePageItem("services", id) ||
+    state.services.find((service) => Number(service.id) === Number(id)) ||
+    null;
+}
+
+function upsertStateItem(type, item) {
+  if (!item?.id) return;
+  const stateKey = type === "equipment" ? "equipment" : type;
+  const current = Array.isArray(state[stateKey]) ? state[stateKey] : [];
+  const index = current.findIndex((entry) => Number(entry.id) === Number(item.id));
+  if (index >= 0) current[index] = item;
+  else current.push(item);
+  state[stateKey] = current;
+
+  Object.values(state.remotePages).forEach((page) => {
+    const pageIndex = page.items?.findIndex((entry) => Number(entry.id) === Number(item.id));
+    if (pageIndex >= 0) page.items[pageIndex] = item;
+  });
+}
+
+function removeStateItem(type, id) {
+  const stateKey = type === "equipment" ? "equipment" : type;
+  if (Array.isArray(state[stateKey])) {
+    state[stateKey] = state[stateKey].filter((item) => Number(item.id) !== Number(id));
+  }
+  Object.values(state.remotePages).forEach((page) => {
+    if (Array.isArray(page.items)) {
+      page.items = page.items.filter((item) => Number(item.id) !== Number(id));
+    }
+  });
 }
 
 function renderPagination(type, pageData) {
@@ -1185,11 +1294,15 @@ function restoreSnapshot(snapshot) {
   state.clients = structuredClone(snapshot.clients);
   state.equipment = structuredClone(snapshot.equipment);
   state.products = structuredClone(snapshot.products);
-  state.services = structuredClone(snapshot.services);
+  if (!state.remoteEnabled) {
+    state.services = structuredClone(snapshot.services);
+  }
   persistClients();
   persistEquipment();
   persistProducts();
-  persistServices();
+  if (!state.remoteEnabled) {
+    persistServices();
+  }
   state.selectedRow = null;
   renderAll();
   showToast("Eliminacion deshecha");
@@ -1343,7 +1456,7 @@ function renderServices() {
     });
     tr.addEventListener("contextmenu", (event) => {
       selectRow("services", service.id, tr);
-      showActionMenu("services", service.id, event);
+      showActionMenu("services", service.id, event, service);
     });
     tr.querySelector("[data-open-client] strong")?.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -1411,7 +1524,7 @@ function clearServiceHistoryFilter() {
   renderAll();
 }
 
-function actionMenuItems(type, id) {
+function actionMenuItems(type, id, recordItem = null) {
   const base = [
     { action: "edit", label: "Editar" },
     { action: "delete", label: "Eliminar" },
@@ -1420,7 +1533,7 @@ function actionMenuItems(type, id) {
   if (type === "equipment") return [...base, { action: "equipment-history", label: "Historial equipo" }];
   if (type === "services") {
     const actions = [];
-    const service = state.services.find(s => s.id === id);
+    const service = recordItem || getServiceRecord(id);
     if (service) {
       if (["Sin revisar", "Revision demorada"].includes(service.status)) {
         actions.push({ action: "finish-service", label: "Finalizar" });
@@ -1441,12 +1554,12 @@ function actionMenuItems(type, id) {
   return base;
 }
 
-function showActionMenu(type, id, event) {
+function showActionMenu(type, id, event, recordItem = null) {
   if (event.type !== "contextmenu") return;
   event.preventDefault?.();
   event.stopPropagation();
-  state.actionMenuRecord = { type, id };
-  els.serviceActionMenu.innerHTML = actionMenuItems(type, id)
+  state.actionMenuRecord = { type, id, item: recordItem };
+  els.serviceActionMenu.innerHTML = actionMenuItems(type, id, recordItem)
     .map((item) => `<button type="button" data-action-menu-action="${item.action}">${escapeHtml(item.label)}</button>`)
     .join("");
   decorateActionButtons(els.serviceActionMenu);
@@ -1492,14 +1605,14 @@ async function handleActionMenuClick(event) {
     const clientId = record.type === "clients"
       ? record.id
       : record.type === "services"
-        ? state.services.find((service) => service.id === record.id)?.clientId
+        ? (record.item || getServiceRecord(record.id))?.clientId
         : null;
     if (clientId) applyServiceHistoryFilter("client", clientId);
   } else if (action === "equipment-history") {
     const equipmentId = record.type === "equipment"
       ? record.id
       : record.type === "services"
-        ? state.services.find((service) => service.id === record.id)?.equipmentId
+        ? (record.item || getServiceRecord(record.id))?.equipmentId
         : null;
     if (equipmentId) applyServiceHistoryFilter("equipment", equipmentId);
   } else if (action === "finish-service") {
@@ -1510,32 +1623,42 @@ async function handleActionMenuClick(event) {
     showServiceTab("service-work-tab");
   } else if (action === "deliver-service") {
     closeActionMenu();
-    changeServiceStatus(record.id, "Entregado");
+    await changeServiceStatus(record.id, "Entregado", record.item);
   } else if (action === "cancel-service") {
     closeActionMenu();
-    changeServiceStatus(record.id, "Cancelado");
+    await changeServiceStatus(record.id, "Cancelado", record.item);
   }
 }
 
-function changeServiceStatus(id, newStatus) {
-  const previous = state.services.find((s) => s.id === id);
+async function changeServiceStatus(id, newStatus, seed = null) {
+  const previous = seed || getServiceRecord(id);
   if (!previous) return;
-  const snapshot = snapshotData();
   const dates = nextServiceDates(previous, newStatus);
-  state.services = state.services.map((s) =>
-    s.id === id ? { ...s, status: newStatus, ...dates } : s
-  );
-  persistServices();
+  const updated = { ...previous, status: newStatus, ...dates };
+  if (state.remoteEnabled) {
+    upsertStateItem("services", updated);
+    await persistRemoteItem("services", updated);
+  } else {
+    const snapshot = snapshotData();
+    state.services = state.services.map((s) =>
+      s.id === id ? updated : s
+    );
+    persistServices();
+    showToast(`Servicio marcado como ${displayServiceStatusLabel(newStatus)}`, {
+      actionLabel: "Deshacer",
+      onAction: () => restoreSnapshot(snapshot),
+    });
+  }
   state.selectedRow = { type: "services", id };
   keepSavedServiceVisible(id);
   renderAll();
-  showToast(`Servicio marcado como ${displayServiceStatusLabel(newStatus)}`, {
-    actionLabel: "Deshacer",
-    onAction: () => restoreSnapshot(snapshot),
-  });
+  if (state.remoteEnabled) {
+    showToast(`Servicio marcado como ${displayServiceStatusLabel(newStatus)}`);
+  }
 }
 
 async function checkServiceDelayAlerts() {
+  if (state.remoteEnabled) return;
   if (state.serviceDelayPromptShown) return;
   state.serviceDelayPromptShown = true;
 
@@ -2800,7 +2923,7 @@ function openServiceDialog(id = null) {
   els.serviceDialogTitle.textContent = id ? "Editar servicio" : "Nuevo servicio";
   refreshServiceClientDatalist();
 
-  const service = state.services.find((item) => item.id === id);
+  const service = getServiceRecord(id);
   if (service) {
     const client = getClientById(service.clientId);
     els.serviceFields.client.value = clientToOption(client);
@@ -2845,7 +2968,7 @@ function closeServiceDialog() {
   els.serviceDialog.close();
 }
 
-function saveService(event) {
+async function saveService(event) {
   event.preventDefault();
   els.serviceError.textContent = "";
 
@@ -2858,36 +2981,61 @@ function saveService(event) {
   }
 
   const snapshot = snapshotData();
+  const previous = state.editingServiceId ? getServiceRecord(state.editingServiceId) : null;
   const previousStatus = state.editingServiceId
-    ? state.services.find((service) => service.id === state.editingServiceId)?.status
+    ? previous?.status
     : null;
   const resetToNewStage = ["Revisado", "Retiro demorado", "Entregado"].includes(previousStatus) &&
     ["Sin revisar", "Revision demorada"].includes(data.status);
   const serviceData = resetToNewStage ? resetServiceWorkStage(data) : data;
   let savedId = state.editingServiceId;
+  let savedService = null;
   if (state.editingServiceId) {
-    const previous = state.services.find((service) => service.id === state.editingServiceId);
+    if (!previous) {
+      els.serviceError.textContent = "No se pudo encontrar el service seleccionado. Actualice la lista e intente nuevamente.";
+      return;
+    }
     const dates = nextServiceDates(previous, serviceData.status);
-    state.services = state.services.map((service) =>
-      service.id === state.editingServiceId ? { ...service, ...serviceData, ...dates } : service
-    );
+    savedService = { ...previous, ...serviceData, ...dates, id: state.editingServiceId };
   } else {
-    savedId = nextServiceId();
-    state.services.push({
-      id: savedId,
+    savedService = {
+      id: state.remoteEnabled ? 0 : nextServiceId(),
       ...serviceData,
       entryDate: new Date().toISOString(),
       finishDate: ["Revisado", "Retiro demorado", "Entregado"].includes(serviceData.status) ? new Date().toISOString() : "",
       deliveryDate: serviceData.status === "Entregado" ? new Date().toISOString() : "",
-    });
+    };
+    savedId = savedService.id;
   }
 
-  persistServices();
+  if (state.remoteEnabled) {
+    if (state.editingServiceId) {
+      upsertStateItem("services", savedService);
+      await persistRemoteItem("services", savedService);
+    } else {
+      const created = await createRemoteItem("services", savedService);
+      if (!created) return;
+      savedService = created;
+      savedId = created.id;
+      upsertStateItem("services", created);
+    }
+  } else {
+    if (state.editingServiceId) {
+      state.services = state.services.map((service) =>
+        service.id === state.editingServiceId ? savedService : service
+      );
+    } else {
+      state.services.push(savedService);
+    }
+    persistServices();
+  }
+
   state.selectedRow = { type: "services", id: savedId };
   keepSavedServiceVisible(savedId);
   renderAll();
   const statusChanged = state.editingServiceId && previousStatus && previousStatus !== data.status;
-  showToast(state.editingServiceId ? "Servicio actualizado" : "Servicio agregado", statusChanged ? {
+  const canUndoStatusChange = !state.remoteEnabled && statusChanged;
+  showToast(state.editingServiceId ? "Servicio actualizado" : "Servicio agregado", canUndoStatusChange ? {
     actionLabel: "Deshacer",
     onAction: () => restoreSnapshot(snapshot),
   } : {});
@@ -2916,7 +3064,7 @@ function resetServiceWorkStage(data) {
 }
 
 function keepSavedServiceVisible(id) {
-  const service = state.services.find((item) => item.id === id);
+  const service = getServiceRecord(id);
   if (!service) return;
 
   const allowedStatuses = getAllowedServiceStatuses();
@@ -3532,22 +3680,31 @@ function refreshSettingsTypeDatalist() {
 }
 
 async function deleteService(id) {
-  const service = state.services.find((item) => item.id === id);
+  const service = getServiceRecord(id);
   if (!service) return;
   const snapshot = snapshotData();
   const client = getClientById(service.clientId);
   const confirmed = await showMessage("Confirmar eliminacion", `Eliminar la orden de servicio de ${client?.name || "cliente eliminado"}?`, "warning", "confirm");
   if (!confirmed) return;
 
-  state.services = state.services.filter((item) => item.id !== id);
-  persistServices();
+  if (state.remoteEnabled) {
+    removeStateItem("services", id);
+    await deleteRemoteItem("services", id);
+  } else {
+    state.services = state.services.filter((item) => item.id !== id);
+    persistServices();
+  }
   state.selectedRow = null;
   renderAll();
-  showToast("Servicio eliminado", { actionLabel: "Deshacer", onAction: () => restoreSnapshot(snapshot) });
+  showToast("Servicio eliminado", state.remoteEnabled ? {} : {
+    actionLabel: "Deshacer",
+    onAction: () => restoreSnapshot(snapshot),
+  });
 }
 
 function nextServiceDates(previous, newStatus) {
   const now = new Date().toISOString();
+  const current = previous || {};
   if (["Sin revisar", "Revision demorada"].includes(newStatus)) {
     return {
       finishDate: "",
@@ -3555,8 +3712,8 @@ function nextServiceDates(previous, newStatus) {
     };
   }
   return {
-    finishDate: ["Revisado", "Retiro demorado", "Entregado"].includes(newStatus) && !previous.finishDate ? now : previous.finishDate,
-    deliveryDate: newStatus === "Entregado" && !previous.deliveryDate ? now : previous.deliveryDate,
+    finishDate: ["Revisado", "Retiro demorado", "Entregado"].includes(newStatus) && !current.finishDate ? now : current.finishDate,
+    deliveryDate: newStatus === "Entregado" && !current.deliveryDate ? now : current.deliveryDate,
   };
 }
 
