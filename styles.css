@@ -593,7 +593,7 @@ h2 {
 
 .timeline-item {
   display: grid;
-  grid-template-columns: 10px minmax(0, 1fr);
+  grid-template-columns: 10px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: start;
   padding: 10px 0;
@@ -610,6 +610,10 @@ h2 {
 
 .timeline-item p {
   color: #344054;
+}
+
+.activity-undo {
+  align-self: center;
 }
 
 .status-stack {
@@ -1805,9 +1809,21 @@ tbody tr.work-pending {
   justify-self: start;
 }
 
+.replace-tool {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  align-items: end;
+}
+
+.replace-tool button {
+  justify-self: start;
+}
+
 .work-entry label,
 .service-total label,
-.delay-settings label {
+.delay-settings label,
+.replace-tool label {
   display: grid;
   gap: 7px;
   color: #415065;
@@ -1818,7 +1834,8 @@ tbody tr.work-pending {
 .work-entry input,
 .service-total input,
 .delay-settings input,
-.delay-settings select {
+.delay-settings select,
+.replace-tool input {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 6px;

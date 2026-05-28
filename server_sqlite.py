@@ -80,6 +80,15 @@ def init_db():
 
             CREATE INDEX IF NOT EXISTS idx_tenant_items_bucket_search
             ON tenant_items (user_id, bucket, search_text);
+
+            CREATE TABLE IF NOT EXISTS undo_actions (
+              id TEXT PRIMARY KEY,
+              user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+              label TEXT NOT NULL,
+              payload TEXT NOT NULL,
+              undone INTEGER NOT NULL DEFAULT 0,
+              created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
             """
         )
         columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
@@ -329,6 +338,192 @@ def write_bucket_list(conn, user_id, bucket, value):
         """,
         (user_id, bucket, json.dumps(value, ensure_ascii=False)),
     )
+
+
+def path_label(path):
+    return ".".join(str(part) for part in path)
+
+
+def replace_text_recursive(value, search, replacement, path=None):
+    path = path or []
+    if isinstance(value, str):
+        if search in value:
+            return value.replace(search, replacement), [{
+                "path": path,
+                "before": value,
+                "after": value.replace(search, replacement),
+            }]
+        return value, []
+    if isinstance(value, list):
+        changed = []
+        next_value = []
+        for index, item in enumerate(value):
+            replaced, diffs = replace_text_recursive(item, search, replacement, [*path, index])
+            next_value.append(replaced)
+            changed.extend(diffs)
+        return next_value, changed
+    if isinstance(value, dict):
+        changed = []
+        next_value = {}
+        for key, item in value.items():
+            replaced, diffs = replace_text_recursive(item, search, replacement, [*path, key])
+            next_value[key] = replaced
+            changed.extend(diffs)
+        return next_value, changed
+    return value, []
+
+
+def set_path_value(value, path, new_value):
+    target = value
+    for part in path[:-1]:
+        if isinstance(target, list):
+            target = target[int(part)]
+        else:
+            target = target[part]
+    last = path[-1]
+    if isinstance(target, list):
+        target[int(last)] = new_value
+    else:
+        target[last] = new_value
+
+
+def create_undo_action(conn, user_id, label, payload):
+    action_id = str(uuid.uuid4())
+    conn.execute(
+        """
+        INSERT INTO undo_actions (id, user_id, label, payload)
+        VALUES (?, ?, ?, ?)
+        """,
+        (action_id, user_id, label, json.dumps(payload, ensure_ascii=False)),
+    )
+    return action_id
+
+
+def recent_undo_actions(user_id, limit=6):
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, label, undone, created_at
+            FROM undo_actions
+            WHERE user_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+            """,
+            (user_id, limit),
+        ).fetchall()
+    return [
+        {
+            "date": row["created_at"],
+            "text": row["label"],
+            "undoId": row["id"],
+            "undone": bool(row["undone"]),
+        }
+        for row in rows
+    ]
+
+
+def replace_text_tool(user_id, search, replacement):
+    search = str(search or "")
+    replacement = str(replacement or "")
+    if not search:
+        raise PublicError("Debe indicar el texto a buscar.")
+    diffs = []
+    changed_items = 0
+    with connect() as conn:
+        for bucket in ITEM_BUCKETS:
+            items = read_bucket_list(conn, user_id, bucket)
+            bucket_changed = False
+            for index, item in enumerate(items):
+                if not isinstance(item, dict):
+                    continue
+                item_id_value = item_id(item)
+                replaced, item_diffs = replace_text_recursive(item, search, replacement)
+                if item_diffs:
+                    items[index] = replaced
+                    bucket_changed = True
+                    changed_items += 1
+                    for diff in item_diffs:
+                        diffs.append({
+                            "bucket": bucket,
+                            "itemId": item_id_value,
+                            **diff,
+                        })
+            if bucket_changed:
+                write_bucket_list(conn, user_id, bucket, items)
+                sync_bucket_items(conn, user_id, bucket, items)
+
+        settings = read_bucket_list(conn, user_id, "settings")
+        if not settings:
+            row = conn.execute(
+                "SELECT data FROM tenant_data WHERE user_id = ? AND bucket = 'settings'",
+                (user_id,),
+            ).fetchone()
+            settings = json.loads(row["data"]) if row else default_settings()
+        replaced_settings, settings_diffs = replace_text_recursive(settings, search, replacement)
+        if settings_diffs:
+            conn.execute(
+                """
+                INSERT INTO tenant_data (user_id, bucket, data, updated_at)
+                VALUES (?, 'settings', ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, bucket)
+                DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+                """,
+                (user_id, json.dumps(replaced_settings, ensure_ascii=False)),
+            )
+            for diff in settings_diffs:
+                diffs.append({"bucket": "settings", "itemId": None, **diff})
+
+        action_id = None
+        if diffs:
+            label = f'Reemplazo masivo: "{search}" por "{replacement}" ({len(diffs)} cambio(s))'
+            action_id = create_undo_action(conn, user_id, label, {"type": "replace-text", "diffs": diffs})
+    return {"count": len(diffs), "items": changed_items, "undoId": action_id}
+
+
+def undo_action(user_id, action_id):
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM undo_actions WHERE user_id = ? AND id = ?",
+            (user_id, action_id),
+        ).fetchone()
+        if not row:
+            raise PublicError("Accion no encontrada.")
+        if row["undone"]:
+            raise PublicError("Esta accion ya fue deshecha.")
+        payload = json.loads(row["payload"])
+        diffs = payload.get("diffs", [])
+        buckets = {}
+        for diff in diffs:
+            buckets.setdefault(diff["bucket"], []).append(diff)
+        for bucket, bucket_diffs in buckets.items():
+            if bucket == "settings":
+                settings_row = conn.execute(
+                    "SELECT data FROM tenant_data WHERE user_id = ? AND bucket = 'settings'",
+                    (user_id,),
+                ).fetchone()
+                value = json.loads(settings_row["data"]) if settings_row else default_settings()
+                for diff in bucket_diffs:
+                    set_path_value(value, diff["path"], diff["before"])
+                conn.execute(
+                    """
+                    INSERT INTO tenant_data (user_id, bucket, data, updated_at)
+                    VALUES (?, 'settings', ?, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_id, bucket)
+                    DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+                    """,
+                    (user_id, json.dumps(value, ensure_ascii=False)),
+                )
+                continue
+
+            items = read_bucket_list(conn, user_id, bucket)
+            by_id = {item_id(item): item for item in items if isinstance(item, dict)}
+            for diff in bucket_diffs:
+                item = by_id.get(int(diff["itemId"]))
+                if item is not None:
+                    set_path_value(item, diff["path"], diff["before"])
+            write_bucket_list(conn, user_id, bucket, items)
+            sync_bucket_items(conn, user_id, bucket, items)
+        conn.execute("UPDATE undo_actions SET undone = 1 WHERE id = ?", (action_id,))
 
 
 def write_item(user_id, bucket, item_id_value, value):
@@ -632,6 +827,7 @@ def dashboard_summary(user_id):
             "text": f"Cliente registrado: {client.get('name') or 'Sin nombre'}",
         })
 
+    recent.extend(recent_undo_actions(user_id, 6))
     recent.sort(key=lambda item: item.get("date") or "", reverse=True)
     return {
         "counts": counts,
@@ -735,6 +931,18 @@ class ServicesHandler(BaseHTTPRequestHandler):
 
             if self.command == "GET" and path == "/api/dashboard":
                 self.send_json(200, dashboard_summary(user["id"]))
+                return
+
+            if self.command == "POST" and path == "/api/tools/replace-text":
+                body = self.read_json()
+                result = replace_text_tool(user["id"], body.get("search", ""), body.get("replacement", ""))
+                self.send_json(200, result)
+                return
+
+            if self.command == "POST" and path.startswith("/api/undo-actions/"):
+                action_id = path.rsplit("/", 1)[-1]
+                undo_action(user["id"], action_id)
+                self.send_json(200, {"ok": True})
                 return
 
             if self.command == "GET" and path.startswith("/api/items/"):
