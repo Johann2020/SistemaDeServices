@@ -2237,7 +2237,7 @@ function closeProductDialog() {
   els.productDialog.close();
 }
 
-function saveProduct(event) {
+async function saveProduct(event) {
   event.preventDefault();
   els.productError.textContent = "";
 
@@ -2250,17 +2250,42 @@ function saveProduct(event) {
   }
 
   let savedId = state.editingProductId;
+  let savedProduct = null;
   if (state.editingProductId) {
-    state.products = state.products.map((product) =>
-      product.id === state.editingProductId ? { ...product, ...data } : product
-    );
+    const previous = state.products.find((product) => Number(product.id) === Number(state.editingProductId));
+    if (!previous) {
+      els.productError.textContent = "No se pudo encontrar el producto seleccionado. Actualice la lista e intente nuevamente.";
+      return;
+    }
+    savedProduct = { ...previous, ...data, id: state.editingProductId };
   } else {
-    savedId = nextProductId();
-    state.products.push({ id: savedId, ...data });
+    savedProduct = { id: state.remoteEnabled ? 0 : nextProductId(), ...data };
+    savedId = savedProduct.id;
   }
 
-  persistProducts();
+  if (state.remoteEnabled) {
+    if (state.editingProductId) {
+      upsertStateItem("products", savedProduct);
+      await persistRemoteItem("products", savedProduct);
+    } else {
+      const created = await createRemoteItem("products", savedProduct);
+      if (!created) return;
+      savedProduct = created;
+      savedId = created.id;
+      upsertStateItem("products", created);
+    }
+  } else {
+    if (state.editingProductId) {
+      state.products = state.products.map((product) =>
+        product.id === state.editingProductId ? savedProduct : product
+      );
+    } else {
+      state.products.push(savedProduct);
+    }
+    persistProducts();
+  }
   state.selectedRow = { type: "products", id: savedId };
+  clearRemotePage("products");
   renderAll();
   showToast(state.editingProductId ? "Producto actualizado" : "Producto agregado");
   if (els.serviceDialog.open) {
@@ -2316,11 +2341,20 @@ async function deleteProduct(id) {
   const confirmed = await showMessage("Confirmar eliminacion", `Eliminar ${productLabel(product)}?\n\nEsta accion no se puede deshacer.`, "warning", "confirm");
   if (!confirmed) return;
 
-  state.products = state.products.filter((item) => item.id !== id);
-  persistProducts();
+  if (state.remoteEnabled) {
+    removeStateItem("products", id);
+    await deleteRemoteItem("products", id);
+  } else {
+    state.products = state.products.filter((item) => item.id !== id);
+    persistProducts();
+  }
   state.selectedRow = null;
+  clearRemotePage("products");
   renderAll();
-  showToast("Producto eliminado", { actionLabel: "Deshacer", onAction: () => restoreSnapshot(snapshot) });
+  showToast("Producto eliminado", state.remoteEnabled ? {} : {
+    actionLabel: "Deshacer",
+    onAction: () => restoreSnapshot(snapshot),
+  });
 }
 
 function refreshProductDatalists() {

@@ -302,6 +302,7 @@ def read_tenant_lookup_state(user_id):
 
 def write_bucket(user_id, bucket, value):
     with connect() as conn:
+        before_items = read_bucket_list(conn, user_id, bucket) if bucket in ITEM_BUCKETS else []
         conn.execute(
             """
             INSERT INTO tenant_data (user_id, bucket, data, updated_at)
@@ -312,6 +313,33 @@ def write_bucket(user_id, bucket, value):
             (user_id, bucket, json.dumps(value, ensure_ascii=False)),
         )
         sync_bucket_items(conn, user_id, bucket, value)
+        if bucket in ITEM_BUCKETS and isinstance(value, list):
+            before_by_id = {item_id(item): item for item in before_items if isinstance(item, dict) and item_id(item) is not None}
+            after_by_id = {item_id(item): item for item in value if isinstance(item, dict) and item_id(item) is not None}
+            for row_id, after in after_by_id.items():
+                before = before_by_id.get(row_id)
+                if before is None:
+                    create_undo_action(
+                        conn,
+                        user_id,
+                        undo_label("create", bucket, after),
+                        {"type": "item-create", "bucket": bucket, "itemId": row_id, "after": after},
+                    )
+                elif json.dumps(before, sort_keys=True, ensure_ascii=False) != json.dumps(after, sort_keys=True, ensure_ascii=False):
+                    create_undo_action(
+                        conn,
+                        user_id,
+                        undo_label("update", bucket, after),
+                        {"type": "item-update", "bucket": bucket, "itemId": row_id, "before": before, "after": after},
+                    )
+            for row_id, before in before_by_id.items():
+                if row_id not in after_by_id:
+                    create_undo_action(
+                        conn,
+                        user_id,
+                        undo_label("delete", bucket, before),
+                        {"type": "item-delete", "bucket": bucket, "itemId": row_id, "before": before},
+                    )
 
 
 def read_bucket_list(conn, user_id, bucket):
@@ -397,6 +425,46 @@ def create_undo_action(conn, user_id, label, payload):
         (action_id, user_id, label, json.dumps(payload, ensure_ascii=False)),
     )
     return action_id
+
+
+def item_display_name(bucket, value):
+    if not isinstance(value, dict):
+        return ""
+    if bucket == "clients":
+        return value.get("name") or f"#{value.get('id', '')}"
+    if bucket == "equipment":
+        return " ".join(
+            str(part).strip()
+            for part in [value.get("type"), value.get("brand"), value.get("model")]
+            if str(part or "").strip()
+        ) or f"#{value.get('id', '')}"
+    if bucket == "products":
+        return " ".join(
+            str(part).strip()
+            for part in [value.get("type"), value.get("brand"), value.get("model")]
+            if str(part or "").strip()
+        ) or f"#{value.get('id', '')}"
+    if bucket == "services":
+        return f"Orden #{value.get('id', '')}".strip()
+    return f"#{value.get('id', '')}"
+
+
+def undo_label(action, bucket, value):
+    names = {
+        "clients": "cliente",
+        "equipment": "equipo",
+        "products": "producto",
+        "services": "service",
+    }
+    verbs = {
+        "create": "Agregado",
+        "update": "Editado",
+        "delete": "Eliminado",
+    }
+    name = names.get(bucket, bucket)
+    display = item_display_name(bucket, value)
+    suffix = f": {display}" if display else ""
+    return f"{verbs.get(action, action)} {name}{suffix}"
 
 
 def recent_undo_actions(user_id, limit=6):
@@ -491,6 +559,20 @@ def undo_action(user_id, action_id):
         if row["undone"]:
             raise PublicError("Esta accion ya fue deshecha.")
         payload = json.loads(row["payload"])
+        action_type = payload.get("type")
+        if action_type == "item-create":
+            delete_item_in_conn(conn, user_id, payload["bucket"], payload["itemId"])
+            conn.execute("UPDATE undo_actions SET undone = 1 WHERE id = ?", (action_id,))
+            return
+        if action_type == "item-update":
+            write_item_in_conn(conn, user_id, payload["bucket"], payload["itemId"], payload["before"])
+            conn.execute("UPDATE undo_actions SET undone = 1 WHERE id = ?", (action_id,))
+            return
+        if action_type == "item-delete":
+            write_item_in_conn(conn, user_id, payload["bucket"], payload["itemId"], payload["before"])
+            conn.execute("UPDATE undo_actions SET undone = 1 WHERE id = ?", (action_id,))
+            return
+
         diffs = payload.get("diffs", [])
         buckets = {}
         for diff in diffs:
@@ -526,6 +608,39 @@ def undo_action(user_id, action_id):
         conn.execute("UPDATE undo_actions SET undone = 1 WHERE id = ?", (action_id,))
 
 
+def write_item_in_conn(conn, user_id, bucket, item_id_value, value):
+    item_id_number = int(item_id_value)
+    value = dict(value)
+    value["id"] = item_id_number
+    items = read_bucket_list(conn, user_id, bucket)
+    replaced = False
+    for index, item in enumerate(items):
+        if item_id(item) == item_id_number:
+            items[index] = value
+            replaced = True
+            break
+    if not replaced:
+        items.append(value)
+    write_bucket_list(conn, user_id, bucket, items)
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO tenant_items (user_id, bucket, item_id, data, search_text, updated_at)
+        VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        """,
+        (user_id, bucket, item_id_number, json.dumps(value, ensure_ascii=False), item_search_text(value)),
+    )
+
+
+def delete_item_in_conn(conn, user_id, bucket, item_id_value):
+    item_id_number = int(item_id_value)
+    items = [item for item in read_bucket_list(conn, user_id, bucket) if item_id(item) != item_id_number]
+    write_bucket_list(conn, user_id, bucket, items)
+    conn.execute(
+        "DELETE FROM tenant_items WHERE user_id = ? AND bucket = ? AND item_id = ?",
+        (user_id, bucket, item_id_number),
+    )
+
+
 def write_item(user_id, bucket, item_id_value, value):
     if bucket not in ITEM_BUCKETS or not isinstance(value, dict):
         raise PublicError("Dato no valido.")
@@ -538,8 +653,10 @@ def write_item(user_id, bucket, item_id_value, value):
     with connect() as conn:
         items = read_bucket_list(conn, user_id, bucket)
         replaced = False
+        before = None
         for index, item in enumerate(items):
             if item_id(item) == item_id_number:
+                before = dict(item)
                 items[index] = value
                 replaced = True
                 break
@@ -553,6 +670,19 @@ def write_item(user_id, bucket, item_id_value, value):
             """,
             (user_id, bucket, item_id_number, json.dumps(value, ensure_ascii=False), item_search_text(value)),
         )
+        if before is not None:
+            create_undo_action(
+                conn,
+                user_id,
+                undo_label("update", bucket, value),
+                {
+                    "type": "item-update",
+                    "bucket": bucket,
+                    "itemId": item_id_number,
+                    "before": before,
+                    "after": value,
+                },
+            )
 
 
 def create_item(user_id, bucket, value):
@@ -575,6 +705,17 @@ def create_item(user_id, bucket, value):
             """,
             (user_id, bucket, next_id, json.dumps(value, ensure_ascii=False), item_search_text(value)),
         )
+        create_undo_action(
+            conn,
+            user_id,
+            undo_label("create", bucket, value),
+            {
+                "type": "item-create",
+                "bucket": bucket,
+                "itemId": next_id,
+                "after": value,
+            },
+        )
     return value
 
 
@@ -587,12 +728,26 @@ def delete_item(user_id, bucket, item_id_value):
         raise PublicError("ID no valido.")
 
     with connect() as conn:
-        items = [item for item in read_bucket_list(conn, user_id, bucket) if item_id(item) != item_id_number]
+        items = read_bucket_list(conn, user_id, bucket)
+        before = next((item for item in items if item_id(item) == item_id_number), None)
+        items = [item for item in items if item_id(item) != item_id_number]
         write_bucket_list(conn, user_id, bucket, items)
         conn.execute(
             "DELETE FROM tenant_items WHERE user_id = ? AND bucket = ? AND item_id = ?",
             (user_id, bucket, item_id_number),
         )
+        if before is not None:
+            create_undo_action(
+                conn,
+                user_id,
+                undo_label("delete", bucket, before),
+                {
+                    "type": "item-delete",
+                    "bucket": bucket,
+                    "itemId": item_id_number,
+                    "before": before,
+                },
+            )
 
 
 def read_item(conn, user_id, bucket, item_id_value):
