@@ -232,9 +232,12 @@ const els = {
     reviewDelayUnit: document.querySelector("#service-review-delay-unit"),
     pickupDelayAmount: document.querySelector("#service-pickup-delay-amount"),
     pickupDelayUnit: document.querySelector("#service-pickup-delay-unit"),
+    replaceSearch: document.querySelector("#replace-search"),
+    replaceValue: document.querySelector("#replace-value"),
   },
   saveTransport: document.querySelector("#save-transport"),
   saveServiceDelays: document.querySelector("#save-service-delays"),
+  runReplaceText: document.querySelector("#run-replace-text"),
   addMargin: document.querySelector("#add-margin"),
   addFrequentWork: document.querySelector("#add-frequent-work"),
   deleteOrphanClients: document.querySelector("#delete-orphan-clients"),
@@ -485,6 +488,7 @@ function wireEvents() {
   els.saveWorkPreset.addEventListener("click", addCurrentWorkToPreset);
   els.saveTransport.addEventListener("click", saveTransportCost);
   els.saveServiceDelays?.addEventListener("click", saveServiceDelaySettings);
+  els.runReplaceText?.addEventListener("click", runMassTextReplace);
   els.addMargin.addEventListener("click", addMargin);
   els.addFrequentWork.addEventListener("click", addFrequentWork);
   els.deleteOrphanClients?.addEventListener("click", deleteOrphanClients);
@@ -1395,8 +1399,32 @@ function renderActivityItems(items) {
   items.forEach((client) => {
     const row = els.activityTemplate.content.cloneNode(true);
     row.querySelector("p").textContent = `${formatDateTime(client.date)} · ${client.text}`;
+    if (client.undoId && !client.undone) {
+      const action = document.createElement("button");
+      action.className = "small-button activity-undo";
+      action.type = "button";
+      action.textContent = "Deshacer";
+      action.addEventListener("click", () => undoHistoryAction(client.undoId));
+      row.querySelector(".timeline-item")?.appendChild(action);
+    }
     els.activity.appendChild(row);
   });
+}
+
+async function undoHistoryAction(id) {
+  if (!state.remoteEnabled) {
+    showToast("El historial persistente funciona con la base online", { type: "error" });
+    return;
+  }
+  try {
+    await fetchJson(`/api/undo-actions/${encodeURIComponent(id)}`, { method: "POST", body: "{}" });
+    clearRemotePages();
+    await initializeRemoteState();
+    renderAll();
+    showToast("Cambio deshecho");
+  } catch (error) {
+    showToast(error.message || "No se pudo deshacer el cambio", { type: "error" });
+  }
 }
 
 function renderServices() {
@@ -2011,6 +2039,77 @@ function addFrequentWork() {
   persistSettings();
   renderAll();
   showToast(current ? "Trabajo frecuente actualizado" : "Trabajo frecuente agregado");
+}
+
+async function runMassTextReplace() {
+  const search = els.settingsFields.replaceSearch?.value.trim() || "";
+  const replacement = els.settingsFields.replaceValue?.value || "";
+  if (!search) {
+    showToast("Indique el texto a buscar", { type: "error" });
+    els.settingsFields.replaceSearch?.focus();
+    return;
+  }
+
+  const confirmed = await showMessage(
+    "Reemplazo masivo",
+    `Se reemplazara "${search}" por "${replacement}" en clientes, equipos, productos, services y configuracion.\n\nDesea continuar?`,
+    "warning",
+    "confirm"
+  );
+  if (!confirmed) return;
+
+  if (!state.remoteEnabled) {
+    const snapshot = snapshotData();
+    const buckets = ["clients", "equipment", "products", "services"];
+    let count = 0;
+    buckets.forEach((bucket) => {
+      state[bucket] = replaceTextInObject(state[bucket], search, replacement, () => count += 1);
+    });
+    state.settings = replaceTextInObject(state.settings, search, replacement, () => count += 1);
+    persistClients();
+    persistEquipment();
+    persistProducts();
+    persistServices();
+    persistSettings();
+    renderAll();
+    showToast(`${count} cambio(s) realizados`, {
+      actionLabel: "Deshacer",
+      onAction: () => restoreSnapshot(snapshot),
+    });
+    return;
+  }
+
+  try {
+    const result = await fetchJson("/api/tools/replace-text", {
+      method: "POST",
+      body: JSON.stringify({ search, replacement }),
+    });
+    els.settingsFields.replaceSearch.value = "";
+    els.settingsFields.replaceValue.value = "";
+    clearRemotePages();
+    await initializeRemoteState();
+    renderAll();
+    showToast(result.count ? `${result.count} cambio(s) realizados` : "No se encontraron coincidencias");
+  } catch (error) {
+    showToast(error.message || "No se pudo reemplazar el texto", { type: "error" });
+  }
+}
+
+function replaceTextInObject(value, search, replacement, onChange) {
+  if (typeof value === "string") {
+    if (!value.includes(search)) return value;
+    onChange();
+    return value.split(search).join(replacement);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => replaceTextInObject(item, search, replacement, onChange));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, replaceTextInObject(item, search, replacement, onChange)])
+    );
+  }
+  return value;
 }
 
 function renderEquipment() {
