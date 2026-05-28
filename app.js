@@ -93,6 +93,9 @@ const els = {
   metricClients: document.querySelector("#metric-clients"),
   metricEquipment: document.querySelector("#metric-equipment"),
   metricOpenServices: document.querySelector("#metric-open-services"),
+  metricProfit: document.querySelector("#metric-profit"),
+  profitMonth: document.querySelector("#profit-month"),
+  profitChart: document.querySelector("#profit-chart"),
   statusCounts: {
     sinRevisar: document.querySelector("#status-sin-revisar-count"),
     revisado: document.querySelector("#status-revisado-count"),
@@ -165,9 +168,12 @@ const els = {
     type: document.querySelector("#product-type"),
     brand: document.querySelector("#product-brand"),
     model: document.querySelector("#product-model"),
+    status: document.querySelector("#product-status"),
     cost: document.querySelector("#product-cost"),
     margin: document.querySelector("#product-margin"),
     finalPrice: document.querySelector("#product-final-price"),
+    warrantyAmount: document.querySelector("#product-warranty-amount"),
+    warrantyUnit: document.querySelector("#product-warranty-unit"),
     features: document.querySelector("#product-features"),
   },
   serviceDialog: document.querySelector("#service-dialog"),
@@ -264,6 +270,7 @@ async function boot() {
   renderAll();
   decorateActionButtons();
   loadProvinces();
+  window.addEventListener("resize", scheduleTableFit);
   window.setTimeout(checkServiceDelayAlerts, 400);
 }
 
@@ -494,6 +501,7 @@ function wireEvents() {
   els.deleteOrphanClients?.addEventListener("click", deleteOrphanClients);
   els.messageClose.addEventListener("click", () => closeMessage(false));
   els.serviceActionMenu.addEventListener("click", handleActionMenuClick);
+  els.profitMonth?.addEventListener("change", renderProfitSummary);
   document.addEventListener("click", closeActionMenu);
   document.addEventListener("click", hideServiceClientMenuOnOutsideClick);
   document.addEventListener("click", hideServiceEquipmentMenuOnOutsideClick);
@@ -1036,6 +1044,51 @@ function renderAll() {
   refreshPartProductDatalist();
   refreshFrequentWorkDatalist();
   decorateActionButtons();
+  scheduleTableFit();
+}
+
+let tableFitFrame = 0;
+
+function scheduleTableFit() {
+  if (tableFitFrame) window.cancelAnimationFrame(tableFitFrame);
+  tableFitFrame = window.requestAnimationFrame(() => {
+    tableFitFrame = 0;
+    fitVisibleTables();
+  });
+}
+
+function fitVisibleTables() {
+  document.querySelectorAll(".view.active .table-wrap").forEach((wrap) => {
+    const table = wrap.querySelector("table");
+    const rows = [...wrap.querySelectorAll("tbody tr")];
+    if (!table || rows.length === 0) {
+      wrap.style.height = "";
+      wrap.style.maxHeight = "";
+      return;
+    }
+
+    const rowHeight = rows[0].getBoundingClientRect().height;
+    const headerHeight = table.querySelector("thead")?.getBoundingClientRect().height || 0;
+    const pagination = wrap.querySelector(".pagination-bar");
+    const paginationHeight = pagination && !pagination.classList.contains("hidden")
+      ? pagination.getBoundingClientRect().height
+      : 0;
+    if (!rowHeight || !headerHeight) return;
+
+    const rect = wrap.getBoundingClientRect();
+    const available = Math.max(160, window.innerHeight - rect.top - 12);
+    const chromeHeight = headerHeight + paginationHeight + 2;
+    const visibleRows = Math.max(1, Math.floor((available - chromeHeight) / rowHeight));
+    if (rows.length <= visibleRows) {
+      wrap.style.height = "";
+      wrap.style.maxHeight = "";
+      return;
+    }
+
+    const fittedHeight = chromeHeight + visibleRows * rowHeight;
+    wrap.style.height = `${Math.floor(fittedHeight)}px`;
+    wrap.style.maxHeight = `${Math.floor(fittedHeight)}px`;
+  });
 }
 
 function resetTablePage(type) {
@@ -1354,6 +1407,7 @@ function renderMetrics() {
     dashboard?.openServices ??
     state.services.filter((service) => !["Entregado", "Cancelado"].includes(service.status)).length
   );
+  renderProfitSummary();
 
   els.statusCounts.sinRevisar.textContent = countServicesByStatus("Sin revisar");
   els.statusCounts.revisado.textContent = countServicesByStatus("Revisado");
@@ -1361,6 +1415,75 @@ function renderMetrics() {
   els.statusCounts.retiroDemorado.textContent = countServicesByStatus("Retiro demorado");
   els.statusCounts.entregado.textContent = countServicesByStatus("Entregado");
   els.statusCounts.cancelado.textContent = countServicesByStatus("Cancelado");
+}
+
+function renderProfitSummary() {
+  if (!els.metricProfit) return;
+  const profit = state.dashboard?.profit || calculateLocalProfitSummary();
+  const months = Array.isArray(profit.months) ? profit.months : [];
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  if (els.profitMonth && !els.profitMonth.value) {
+    els.profitMonth.value = months[0]?.month || currentMonth;
+  }
+  const selectedMonth = els.profitMonth?.value || currentMonth;
+  const selected = months.find((item) => item.month === selectedMonth) || { profit: 0 };
+  els.metricProfit.textContent = money(selected.profit);
+  renderProfitChart(months, selectedMonth);
+}
+
+function renderProfitChart(months, selectedMonth) {
+  if (!els.profitChart) return;
+  const visible = months.slice(0, 12).reverse();
+  if (!visible.length) {
+    els.profitChart.innerHTML = `<div class="chart-empty">Todavia no hay ganancias registradas.</div>`;
+    return;
+  }
+  const maxProfit = Math.max(...visible.map((item) => Number(item.profit || 0)), 1);
+  els.profitChart.innerHTML = visible.map((item) => {
+    const height = Math.max(6, Math.round((Number(item.profit || 0) / maxProfit) * 120));
+    const active = item.month === selectedMonth ? " active" : "";
+    return `
+      <button class="profit-bar${active}" type="button" data-profit-month="${escapeHtml(item.month)}" title="${escapeHtml(monthName(item.month))}: ${escapeHtml(money(item.profit))}">
+        <span class="profit-bar-value">${escapeHtml(money(item.profit))}</span>
+        <span class="profit-bar-fill" style="height: ${height}px"></span>
+        <span class="profit-bar-label">${escapeHtml(shortMonthName(item.month))}</span>
+      </button>
+    `;
+  }).join("");
+  els.profitChart.querySelectorAll("[data-profit-month]").forEach((button) => {
+    button.addEventListener("click", () => {
+      if (els.profitMonth) els.profitMonth.value = button.dataset.profitMonth;
+      renderProfitSummary();
+    });
+  });
+}
+
+function calculateLocalProfitSummary() {
+  const productsById = mapById(state.products);
+  const byMonth = new Map();
+  state.services
+    .filter((service) => service.status !== "Cancelado")
+    .forEach((service) => {
+      const date = service.deliveryDate || service.finishDate || service.entryDate;
+      if (!date) return;
+      const month = new Date(date).toISOString().slice(0, 7);
+      const current = byMonth.get(month) || { month, profit: 0, works: 0, parts: 0 };
+      const works = (service.works || []).reduce((sum, work) => sum + Number(work.price || 0), 0);
+      const parts = (service.parts || []).reduce((sum, part) => {
+        const product = productsById.get(Number(part.productId));
+        const quantity = Number(part.quantity || 0);
+        const salePrice = Number(part.salePrice || productFinalPrice(product));
+        const cost = Number(part.cost ?? product?.cost ?? 0);
+        return sum + Math.max(0, salePrice - cost) * quantity;
+      }, 0);
+      current.works += works;
+      current.parts += parts;
+      current.profit += works + parts;
+      byMonth.set(month, current);
+    });
+  return {
+    months: [...byMonth.values()].sort((a, b) => b.month.localeCompare(a.month)),
+  };
 }
 
 function renderActivity() {
@@ -1463,7 +1586,9 @@ function renderServices() {
     const equipment = equipmentById.get(Number(service.equipmentId)) || service._equipment;
     const failure = service.failure || "---";
     const partsSummary = servicePartsSummary(service);
+    const partsTooltip = servicePartsTooltip(service);
     const derivationSummary = serviceDerivationSummary(service);
+    const derivationTooltip = serviceDerivationTooltip(service);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(service.id)}</td>
@@ -1471,8 +1596,8 @@ function renderServices() {
       <td class="linked-cell" data-open-client="${escapeHtml(client?.id || "")}" data-tooltip="${escapeHtml(clientTooltip(client))}"><strong>${escapeHtml(client?.name || "Sin cliente")}</strong></td>
       <td class="linked-cell" data-open-equipment="${escapeHtml(equipment?.id || "")}" data-tooltip="${escapeHtml(equipmentTooltip(equipment))}">${deviceLabelHtml(equipment)}</td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(failure)}"><span class="cell-ellipsis">${escapeHtml(failure)}</span></td>
-      <td class="tooltip-cell" data-tooltip="${escapeHtml(partsSummary)}"><span class="cell-ellipsis">${escapeHtml(partsSummary || "---")}</span></td>
-      <td class="tooltip-cell" data-tooltip="${escapeHtml(derivationSummary)}"><span class="cell-ellipsis">${escapeHtml(derivationSummary || "---")}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(partsTooltip)}"><span class="cell-ellipsis">${escapeHtml(partsSummary || "---")}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(derivationTooltip)}"><span class="cell-ellipsis">${escapeHtml(derivationSummary || "---")}</span></td>
       <td>${dateWithAgeHtml(service.entryDate)}</td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(serviceFinalizedTooltip(service))}">${dateWithAgeHtml(service.finishDate)}</td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(serviceDeliveredTooltip(service))}">${dateWithAgeHtml(service.deliveryDate)}</td>
@@ -2168,7 +2293,7 @@ function renderProducts() {
   const query = normalizeSearch(els.productSearch.value);
   const filtered = state.products.filter((product) => {
     const text = normalizeSearch(
-      [product.id, product.type, product.brand, product.model, product.features].join(" ")
+      [product.id, product.type, product.brand, product.model, product.status, productWarrantyLabel(product), product.features].join(" ")
     );
     return text.includes(query);
   });
@@ -2182,6 +2307,8 @@ function renderProducts() {
       <td>${escapeHtml(product.type)}</td>
       <td>${escapeHtml(product.brand)}</td>
       <td>${escapeHtml(product.model)}</td>
+      <td>${escapeHtml(productStatusLabel(product.status))}</td>
+      <td>${escapeHtml(productWarrantyLabel(product))}</td>
       <td>${escapeHtml(product.features)}</td>
       <td>${money(product.cost)}</td>
       <td>${Number(productMarginPercent(product) || 0)} %</td>
@@ -2215,12 +2342,20 @@ function openProductDialog(id = null, seed = {}) {
     els.productFields.type.value = product.type;
     els.productFields.brand.value = product.brand;
     els.productFields.model.value = product.model;
+    els.productFields.status.value = productStatusLabel(product.status);
     els.productFields.cost.value = product.cost ? String(product.cost) : "";
     els.productFields.margin.value = String(productMarginPercent(product) || "");
+    els.productFields.warrantyAmount.value = product.warrantyAmount ? String(product.warrantyAmount) : "";
+    els.productFields.warrantyUnit.value = product.warrantyUnit || "months";
     els.productFields.features.value = product.features;
   } else if (seed.type) {
     els.productFields.type.value = seed.type;
+    els.productFields.status.value = "Nuevo";
+    els.productFields.warrantyUnit.value = "months";
     fillProductMarginFromType();
+  } else {
+    els.productFields.status.value = "Nuevo";
+    els.productFields.warrantyUnit.value = "months";
   }
 
   refreshProductFinalPrice();
@@ -2300,9 +2435,12 @@ function getProductFormData() {
     type: els.productFields.type.value.trim(),
     brand: els.productFields.brand.value.trim(),
     model: els.productFields.model.value.trim(),
+    status: productStatusLabel(els.productFields.status.value),
     features: els.productFields.features.value.trim(),
     cost: parseMoney(els.productFields.cost.value),
     margin: parseMoney(els.productFields.margin.value),
+    warrantyAmount: parseMoney(els.productFields.warrantyAmount.value),
+    warrantyUnit: ["days", "months", "years"].includes(els.productFields.warrantyUnit.value) ? els.productFields.warrantyUnit.value : "months",
   };
 }
 
@@ -2556,6 +2694,22 @@ function fillProductMarginFromType() {
 function refreshProductFinalPrice() {
   const product = getProductFormData();
   els.productFields.finalPrice.value = money(productFinalPrice(product));
+}
+
+function productStatusLabel(value) {
+  return normalizeSearch(value) === "usado" ? "Usado" : "Nuevo";
+}
+
+function productWarrantyLabel(product) {
+  const amount = Number(product?.warrantyAmount || 0);
+  if (!amount) return "Sin garantia";
+  const unit = product?.warrantyUnit || "months";
+  const labels = {
+    days: amount === 1 ? "dia" : "dias",
+    months: amount === 1 ? "mes" : "meses",
+    years: amount === 1 ? "año" : "años",
+  };
+  return `${amount} ${labels[unit] || "meses"}`;
 }
 
 function renderClients() {
@@ -3428,12 +3582,17 @@ async function addServicePart() {
   const current = state.serviceParts.find((part) => part.productId === product.id);
   if (current) {
     current.quantity += quantity;
-    current.salePrice = productFinalPrice(product);
   } else {
     state.serviceParts.push({
       productId: product.id,
+      productLabel: productLabel(product),
+      productStatus: productStatusLabel(product.status),
       quantity,
+      cost: Number(product.cost || 0),
+      margin: productMarginPercent(product),
       salePrice: productFinalPrice(product),
+      warrantyAmount: Number(product.warrantyAmount || 0),
+      warrantyUnit: product.warrantyUnit || "months",
     });
   }
 
@@ -3531,11 +3690,10 @@ function renderServiceWorks() {
 function renderServiceParts() {
   els.servicePartsBody.innerHTML = "";
   state.serviceParts.forEach((part, index) => {
-    const product = getProductById(part.productId);
     const subtotal = part.quantity * part.salePrice;
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${escapeHtml(productLabel(product))}</td>
+      <td>${escapeHtml(partProductLabel(part))}</td>
       <td><input class="quantity-stepper" type="number" min="1" step="1" data-part-quantity="${index}" value="${part.quantity}"></td>
       <td>${money(subtotal)}</td>
       <td><button class="small-button delete" type="button" data-remove-part="${index}">Quitar</button></td>
@@ -3596,11 +3754,10 @@ function refreshServiceSummary() {
   });
 
   state.serviceParts.forEach((part) => {
-    const product = getProductById(part.productId);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>Repuesto</td>
-      <td>${escapeHtml(productLabel(product))}</td>
+      <td>${escapeHtml(partProductLabel(part))}</td>
       <td>${part.quantity}</td>
       <td>${money(part.quantity * part.salePrice)}</td>
     `;
@@ -4348,6 +4505,10 @@ function productLabel(product) {
   return `${product.type} ${product.brand} ${product.model}`.trim();
 }
 
+function partProductLabel(part) {
+  return part?.productLabel || productLabel(getProductById(part?.productId));
+}
+
 function productToOption(product) {
   return `${productLabel(product)} - ${money(productFinalPrice(product))}`;
 }
@@ -4355,11 +4516,23 @@ function productToOption(product) {
 function servicePartsSummary(service) {
   return (service.parts || [])
     .map((part) => {
-      const product = getProductById(part.productId);
       const quantity = Number(part.quantity || 0);
-      return `${quantity} x ${productLabel(product)}`;
+      return `${quantity} x ${partProductLabel(part)}`;
     })
     .join(" | ");
+}
+
+function servicePartsTooltip(service) {
+  return (service.parts || [])
+    .map((part) => {
+      const quantity = Number(part.quantity || 0);
+      const subtotal = quantity * Number(part.salePrice || 0);
+      const quantityText = quantity > 1 ? `${quantity} x ` : "";
+      const priceText = subtotal ? ` - ${money(subtotal)}` : "";
+      const warrantyText = partWarrantyText(part, service);
+      return `${quantityText}${partProductLabel(part)}${priceText}${warrantyText ? `\nGarantia: ${warrantyText}` : ""}`;
+    })
+    .join("\n");
 }
 
 function serviceDerivationSummary(service) {
@@ -4374,6 +4547,60 @@ function serviceDerivationSummary(service) {
     .join(" | ");
 }
 
+function serviceDerivationTooltip(service) {
+  const works = service.externalWorks || legacyExternalWorks(service);
+  return works
+    .map((work) => {
+      const technician = work.technician || "Externo";
+      const description = work.description || "Trabajo externo";
+      const price = Number(work.price || 0);
+      return `${technician} - ${description}${price ? ` - ${money(price)}` : ""}`;
+    })
+    .join("\n");
+}
+
+function partWarrantyText(part, service) {
+  const amount = Number(part?.warrantyAmount || 0);
+  if (!amount) return "Sin garantia";
+  if (!service?.deliveryDate) return `${productWarrantyLabel(part)} desde la entrega`;
+  const end = addWarrantyTime(new Date(service.deliveryDate), amount, part.warrantyUnit || "months");
+  const remaining = remainingWarrantyText(end);
+  return `${remaining} (vence ${formatDate(end.toISOString())})`;
+}
+
+function addWarrantyTime(date, amount, unit) {
+  const next = new Date(date);
+  if (unit === "years") next.setFullYear(next.getFullYear() + amount);
+  else if (unit === "days") next.setDate(next.getDate() + amount);
+  else next.setMonth(next.getMonth() + amount);
+  return next;
+}
+
+function remainingWarrantyText(endDate) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const end = new Date(endDate);
+  end.setHours(0, 0, 0, 0);
+  const days = Math.ceil((end - today) / 86400000);
+  if (days < 0) return `Vencida hace ${durationText(Math.abs(days))}`;
+  if (days === 0) return "Vence hoy";
+  return `Restan ${durationText(days)}`;
+}
+
+function durationText(totalDays) {
+  if (totalDays >= 365) {
+    const years = Math.floor(totalDays / 365);
+    const days = totalDays % 365;
+    return `${years} ${years === 1 ? "año" : "años"}${days ? ` y ${days} ${days === 1 ? "dia" : "dias"}` : ""}`;
+  }
+  if (totalDays >= 30) {
+    const months = Math.floor(totalDays / 30);
+    const days = totalDays % 30;
+    return `${months} ${months === 1 ? "mes" : "meses"}${days ? ` y ${days} ${days === 1 ? "dia" : "dias"}` : ""}`;
+  }
+  return `${totalDays} ${totalDays === 1 ? "dia" : "dias"}`;
+}
+
 function optionToProductId(option) {
   const product = state.products.find((item) => productToOption(item) === option);
   return product?.id || null;
@@ -4386,6 +4613,22 @@ function parseMoney(value) {
 
 function money(value) {
   return `$ ${Math.round(Number(value || 0)).toLocaleString("es-AR")}`;
+}
+
+function monthName(value) {
+  if (!value) return "---";
+  const [year, month] = value.split("-").map(Number);
+  return new Intl.DateTimeFormat("es-AR", { month: "long", year: "numeric" })
+    .format(new Date(year, month - 1, 1));
+}
+
+function shortMonthName(value) {
+  if (!value) return "---";
+  const [year, month] = value.split("-").map(Number);
+  const label = new Intl.DateTimeFormat("es-AR", { month: "short" })
+    .format(new Date(year, month - 1, 1))
+    .replace(".", "");
+  return `${label} ${String(year).slice(-2)}`;
 }
 
 function formatDate(value) {

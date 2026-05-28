@@ -934,6 +934,35 @@ def tenant_item_counts(user_id):
     return counts
 
 
+def month_key(value):
+    if not value:
+        return None
+    text = str(value)
+    return text[:7] if len(text) >= 7 else None
+
+
+def service_profit(service, products):
+    works_profit = sum(
+        float(work.get("price") or 0)
+        for work in service.get("works", [])
+        if isinstance(work, dict)
+    )
+    parts_profit = 0
+    for part in service.get("parts", []):
+        if not isinstance(part, dict):
+            continue
+        product = products.get(int(part.get("productId") or 0), {})
+        quantity = float(part.get("quantity") or 0)
+        sale_price = float(part.get("salePrice") or 0)
+        cost = float(part.get("cost") if part.get("cost") is not None else product.get("cost") or 0)
+        parts_profit += max(0, sale_price - cost) * quantity
+    return {
+        "works": round(works_profit),
+        "parts": round(parts_profit),
+        "profit": round(works_profit + parts_profit),
+    }
+
+
 def dashboard_summary(user_id):
     counts = tenant_item_counts(user_id)
     status_counts = {
@@ -961,7 +990,15 @@ def dashboard_summary(user_id):
                 (user_id,),
             ).fetchall()
         }
+        products = {
+            row["item_id"]: json.loads(row["data"])
+            for row in conn.execute(
+                "SELECT item_id, data FROM tenant_items WHERE user_id = ? AND bucket = 'products'",
+                (user_id,),
+            ).fetchall()
+        }
 
+    profit_months = {}
     for row in rows:
         try:
             service = json.loads(row["data"])
@@ -975,6 +1012,14 @@ def dashboard_summary(user_id):
             "date": service.get("entryDate"),
             "text": f"Servicio #{service.get('id')}: {client.get('name') or 'Sin cliente'} - {status}",
         })
+        if status != "Cancelado":
+            key = month_key(service.get("deliveryDate") or service.get("finishDate") or service.get("entryDate"))
+            if key:
+                current = profit_months.setdefault(key, {"month": key, "profit": 0, "works": 0, "parts": 0})
+                profit = service_profit(service, products)
+                current["profit"] += profit["profit"]
+                current["works"] += profit["works"]
+                current["parts"] += profit["parts"]
 
     for client in clients.values():
         recent.append({
@@ -992,6 +1037,9 @@ def dashboard_summary(user_id):
         ),
         "statusCounts": status_counts,
         "recentActivity": recent[:6],
+        "profit": {
+            "months": sorted(profit_months.values(), key=lambda item: item["month"], reverse=True),
+        },
     }
 
 

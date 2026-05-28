@@ -81,8 +81,8 @@
               <strong id="metric-open-services">0</strong>
             </article>
             <article class="metric">
-              <span>Facturacion estimada</span>
-              <strong>$ 0</strong>
+              <span>Ganancia estimada</span>
+              <strong id="metric-profit">$ 0</strong>
             </article>
           </div>
 
@@ -120,6 +120,17 @@
               </div>
             </section>
           </div>
+
+          <section class="panel profit-panel">
+            <div class="panel-heading">
+              <h2>Ganancias por mes</h2>
+              <label class="month-filter">
+                Mes
+                <input id="profit-month" type="month">
+              </label>
+            </div>
+            <div class="profit-chart" id="profit-chart"></div>
+          </section>
         </section>
 
         <section class="view" id="clients-view">
@@ -202,6 +213,8 @@
                   <th>Tipo</th>
                   <th>Marca</th>
                   <th>Modelo</th>
+                  <th>Estado</th>
+                  <th>Garantia</th>
                   <th>Caracteristicas</th>
                   <th>Costo</th>
                   <th>Margen</th>
@@ -843,6 +856,15 @@
             <div class="combo-menu" id="product-model-menu"></div>
           </label>
           <label>
+            Estado
+            <span class="select-shell">
+              <select id="product-status" name="status">
+                <option>Nuevo</option>
+                <option>Usado</option>
+              </select>
+            </span>
+          </label>
+          <label>
             Costo
             <input id="product-cost" name="cost" inputmode="numeric" autocomplete="off">
           </label>
@@ -853,6 +875,20 @@
           <label>
             Precio final
             <input id="product-final-price" readonly>
+          </label>
+          <label>
+            Tiempo de garantia
+            <input id="product-warranty-amount" name="warrantyAmount" inputmode="numeric" autocomplete="off" placeholder="Ej. 12">
+          </label>
+          <label>
+            Unidad garantia
+            <span class="select-shell">
+              <select id="product-warranty-unit" name="warrantyUnit">
+                <option value="days">Dias</option>
+                <option value="months">Meses</option>
+                <option value="years">Años</option>
+              </select>
+            </span>
           </label>
           <label class="span-2">
             Caracteristicas
