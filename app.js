@@ -168,6 +168,7 @@ const els = {
     type: document.querySelector("#product-type"),
     brand: document.querySelector("#product-brand"),
     model: document.querySelector("#product-model"),
+    provider: document.querySelector("#product-provider"),
     status: document.querySelector("#product-status"),
     cost: document.querySelector("#product-cost"),
     margin: document.querySelector("#product-margin"),
@@ -2293,7 +2294,7 @@ function renderProducts() {
   const query = normalizeSearch(els.productSearch.value);
   const filtered = state.products.filter((product) => {
     const text = normalizeSearch(
-      [product.id, product.type, product.brand, product.model, product.status, productWarrantyLabel(product), product.features].join(" ")
+      [product.id, product.type, product.brand, product.model, product.provider, product.status, productWarrantyLabel(product), product.features].join(" ")
     );
     return text.includes(query);
   });
@@ -2307,6 +2308,7 @@ function renderProducts() {
       <td>${escapeHtml(product.type)}</td>
       <td>${escapeHtml(product.brand)}</td>
       <td>${escapeHtml(product.model)}</td>
+      <td>${escapeHtml(product.provider || "---")}</td>
       <td>${escapeHtml(productStatusLabel(product.status))}</td>
       <td>${escapeHtml(productWarrantyLabel(product))}</td>
       <td>${escapeHtml(product.features)}</td>
@@ -2342,6 +2344,7 @@ function openProductDialog(id = null, seed = {}) {
     els.productFields.type.value = product.type;
     els.productFields.brand.value = product.brand;
     els.productFields.model.value = product.model;
+    els.productFields.provider.value = product.provider || "";
     els.productFields.status.value = productStatusLabel(product.status);
     els.productFields.cost.value = product.cost ? String(product.cost) : "";
     els.productFields.margin.value = String(productMarginPercent(product) || "");
@@ -2435,6 +2438,7 @@ function getProductFormData() {
     type: els.productFields.type.value.trim(),
     brand: els.productFields.brand.value.trim(),
     model: els.productFields.model.value.trim(),
+    provider: els.productFields.provider.value.trim(),
     status: productStatusLabel(els.productFields.status.value),
     features: els.productFields.features.value.trim(),
     cost: parseMoney(els.productFields.cost.value),
@@ -3586,6 +3590,7 @@ async function addServicePart() {
     state.serviceParts.push({
       productId: product.id,
       productLabel: productLabel(product),
+      provider: product.provider || "",
       productStatus: productStatusLabel(product.status),
       quantity,
       cost: Number(product.cost || 0),
@@ -4529,8 +4534,9 @@ function servicePartsTooltip(service) {
       const subtotal = quantity * Number(part.salePrice || 0);
       const quantityText = quantity > 1 ? `${quantity} x ` : "";
       const priceText = subtotal ? ` - ${money(subtotal)}` : "";
+      const providerText = part.provider ? `\nProveedor: ${part.provider}` : "";
       const warrantyText = partWarrantyText(part, service);
-      return `${quantityText}${partProductLabel(part)}${priceText}${warrantyText ? `\nGarantia: ${warrantyText}` : ""}`;
+      return `${quantityText}${partProductLabel(part)}${priceText}${providerText}${warrantyText ? `\nGarantia: ${warrantyText}` : ""}`;
     })
     .join("\n");
 }
