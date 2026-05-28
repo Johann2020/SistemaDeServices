@@ -20,6 +20,7 @@ const state = {
   editingEquipmentId: null,
   editingProductId: null,
   editingServiceId: null,
+  equipmentDialogSource: "equipment",
   pattern: [],
   serviceWorks: [],
   serviceParts: [],
@@ -34,6 +35,7 @@ const state = {
   adminUser: null,
   impersonating: false,
   csrfToken: "",
+  dashboard: null,
   provinces: [],
   cities: [],
   offlineGeo: false,
@@ -122,6 +124,7 @@ const els = {
   equipmentDialog: document.querySelector("#equipment-dialog"),
   equipmentForm: document.querySelector("#equipment-form"),
   equipmentDialogTitle: document.querySelector("#equipment-dialog-title"),
+  equipmentOrigin: document.querySelector("#equipment-origin"),
   closeEquipmentDialog: document.querySelector("#close-equipment-dialog"),
   cancelEquipmentDialog: document.querySelector("#cancel-equipment-dialog"),
   equipmentError: document.querySelector("#equipment-form-error"),
@@ -724,16 +727,20 @@ async function initializeRemoteState() {
       return;
     }
 
-    const remote = await fetchJson("/api/state");
+    const [remote, dashboard] = await Promise.all([
+      fetchJson("/api/state?lookups=1"),
+      fetchJson("/api/dashboard"),
+    ]);
     state.remoteEnabled = true;
     state.currentUser = session.user;
     state.adminUser = session.admin;
     state.impersonating = Boolean(session.impersonating);
     state.csrfToken = session.csrfToken || "";
+    state.dashboard = dashboard;
     state.clients = Array.isArray(remote.clients) ? remote.clients : [];
     state.equipment = Array.isArray(remote.equipment) ? remote.equipment : [];
     state.products = Array.isArray(remote.products) ? remote.products : [];
-    state.services = Array.isArray(remote.services) ? remote.services : [];
+    state.services = [];
     state.settings = normalizeSettings(remote.settings);
   } catch {
     state.remoteEnabled = false;
@@ -911,6 +918,7 @@ function persistSettings() {
 
 function persistRemote(bucket, value) {
   clearRemotePage(bucket);
+  state.dashboard = null;
   fetch(`/api/state/${bucket}`, {
     method: "PUT",
     credentials: "same-origin",
@@ -919,9 +927,23 @@ function persistRemote(bucket, value) {
       ...(state.csrfToken ? { "X-CSRF-Token": state.csrfToken } : {}),
     },
     body: JSON.stringify(value),
-  }).catch(() => {
+  })
+    .then(() => refreshDashboard())
+    .catch(() => {
     showToast("No se pudo sincronizar con la nube", { type: "error" });
   });
+}
+
+async function refreshDashboard() {
+  if (!state.remoteEnabled) return;
+  try {
+    state.dashboard = await fetchJson("/api/dashboard");
+    renderMetrics();
+    renderServiceFilterControls();
+    renderActivity();
+  } catch {
+    // La app puede seguir funcionando con los datos locales si el resumen falla.
+  }
 }
 
 function renderAll() {
@@ -1059,6 +1081,7 @@ async function requestRemotePage(type, config) {
       total: Number(page.total || 0),
       pages: Number(page.pages || 1),
     };
+    mergeStateItems(type, state.remotePages[type].items);
     renderPagedTable(type);
   } catch {
     clearRemotePage(type);
@@ -1067,6 +1090,16 @@ async function requestRemotePage(type, config) {
       delete state.remotePageRequests[type];
     }
   }
+}
+
+function mergeStateItems(type, items) {
+  const stateKey = type === "equipment" ? "equipment" : type;
+  if (!Array.isArray(state[stateKey]) || !Array.isArray(items)) return;
+  const byId = mapById(state[stateKey]);
+  items.forEach((item) => {
+    if (item?.id) byId.set(Number(item.id), item);
+  });
+  state[stateKey] = [...byId.values()];
 }
 
 function renderPagination(type, pageData) {
@@ -1197,9 +1230,11 @@ function decorateActionButtons(root = document) {
 }
 
 function renderMetrics() {
-  els.metricClients.textContent = String(state.clients.length);
-  els.metricEquipment.textContent = String(state.equipment.length);
+  const dashboard = state.dashboard;
+  els.metricClients.textContent = String(dashboard?.counts?.clients ?? state.clients.length);
+  els.metricEquipment.textContent = String(dashboard?.counts?.equipment ?? state.equipment.length);
   els.metricOpenServices.textContent = String(
+    dashboard?.openServices ??
     state.services.filter((service) => !["Entregado", "Cancelado"].includes(service.status)).length
   );
 
@@ -1213,6 +1248,10 @@ function renderMetrics() {
 
 function renderActivity() {
   els.activity.innerHTML = "";
+  if (Array.isArray(state.dashboard?.recentActivity)) {
+    renderActivityItems(state.dashboard.recentActivity);
+    return;
+  }
   const clientsById = mapById(state.clients);
   const clientActivity = state.clients.map((client) => ({
     date: client.createdAt,
@@ -1229,14 +1268,18 @@ function renderActivity() {
     .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
     .slice(0, 6);
 
-  if (recent.length === 0) {
+  renderActivityItems(recent);
+}
+
+function renderActivityItems(items) {
+  if (items.length === 0) {
     const empty = els.activityTemplate.content.cloneNode(true);
     empty.querySelector("p").textContent = "Todavia no hay actividad cargada.";
     els.activity.appendChild(empty);
     return;
   }
 
-  recent.forEach((client) => {
+  items.forEach((client) => {
     const row = els.activityTemplate.content.cloneNode(true);
     row.querySelector("p").textContent = `${formatDateTime(client.date)} · ${client.text}`;
     els.activity.appendChild(row);
@@ -1252,8 +1295,8 @@ function renderServices() {
     if (allowedStatuses.length > 0 && !allowedStatuses.includes(service.status)) return false;
     if (state.serviceHistoryFilter?.type === "client" && service.clientId !== state.serviceHistoryFilter.id) return false;
     if (state.serviceHistoryFilter?.type === "equipment" && service.equipmentId !== state.serviceHistoryFilter.id) return false;
-    const client = clientsById.get(Number(service.clientId));
-    const equipment = equipmentById.get(Number(service.equipmentId));
+    const client = clientsById.get(Number(service.clientId)) || service._client;
+    const equipment = equipmentById.get(Number(service.equipmentId)) || service._equipment;
     const partsSummary = servicePartsSummary(service);
     const derivationSummary = serviceDerivationSummary(service);
     const text = normalizeSearch(
@@ -1275,8 +1318,8 @@ function renderServices() {
 
   els.servicesBody.innerHTML = "";
   pageData.items.forEach((service) => {
-    const client = clientsById.get(Number(service.clientId));
-    const equipment = equipmentById.get(Number(service.equipmentId));
+    const client = clientsById.get(Number(service.clientId)) || service._client;
+    const equipment = equipmentById.get(Number(service.equipmentId)) || service._equipment;
     const failure = service.failure || "---";
     const partsSummary = servicePartsSummary(service);
     const derivationSummary = serviceDerivationSummary(service);
@@ -1310,7 +1353,7 @@ function renderServices() {
     tr.querySelector("[data-open-equipment] .device-label")?.addEventListener("click", (event) => {
       event.stopPropagation();
       const id = Number(event.currentTarget.closest("[data-open-equipment]")?.dataset.openEquipment);
-      if (id) openEquipmentDialog(id);
+      if (id) openEquipmentDialog(id, { source: "services" });
     });
     tr.addEventListener("dblclick", () => openServiceDialog(service.id));
     els.servicesBody.appendChild(tr);
@@ -1436,7 +1479,7 @@ async function handleActionMenuClick(event) {
   if (action === "edit") {
     closeActionMenu();
     if (record.type === "clients") openClientDialog(record.id);
-    else if (record.type === "equipment") openEquipmentDialog(record.id);
+    else if (record.type === "equipment") openEquipmentDialog(record.id, { source: "equipment" });
     else if (record.type === "products") openProductDialog(record.id);
     else if (record.type === "services") openServiceDialog(record.id);
   } else if (action === "delete") {
@@ -1851,7 +1894,7 @@ function renderEquipment() {
   const query = normalizeSearch(els.equipmentSearch.value);
   const clientsById = mapById(state.clients);
   const filtered = state.equipment.filter((equipment) => {
-    const client = clientsById.get(Number(equipment.clientId));
+    const client = clientsById.get(Number(equipment.clientId)) || equipment._client;
     const text = normalizeSearch(
       [
         equipment.id,
@@ -1871,7 +1914,7 @@ function renderEquipment() {
 
   els.equipmentBody.innerHTML = "";
   pageData.items.forEach((equipment) => {
-    const client = clientsById.get(Number(equipment.clientId));
+    const client = clientsById.get(Number(equipment.clientId)) || equipment._client;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(equipment.id)}</td>
@@ -1891,7 +1934,7 @@ function renderEquipment() {
       selectRow("equipment", equipment.id, tr);
       showActionMenu("equipment", equipment.id, event);
     });
-    tr.addEventListener("dblclick", () => openEquipmentDialog(equipment.id));
+    tr.addEventListener("dblclick", () => openEquipmentDialog(equipment.id, { source: "equipment" }));
     els.equipmentBody.appendChild(tr);
   });
 
@@ -2522,9 +2565,11 @@ function openEquipmentDialog(id = null, seed = {}) {
   }
 
   state.editingEquipmentId = id;
+  state.equipmentDialogSource = seed.source || (seed.hideClient ? "services" : "equipment");
   state.pattern = [];
   els.equipmentError.textContent = "";
   els.equipmentForm.reset();
+  els.equipmentOrigin.value = state.equipmentDialogSource;
   els.equipmentDialogTitle.textContent = id ? "Editar equipo" : "Nuevo equipo";
   els.equipmentClientWrap.classList.toggle("hidden", Boolean(seed.hideClient));
   hideEquipmentClientMenu();
@@ -2575,7 +2620,7 @@ function openQuickEquipmentDialog() {
     els.serviceFields.client.focus();
     return;
   }
-  openEquipmentDialog(null, { clientId, hideClient: true });
+  openEquipmentDialog(null, { clientId, hideClient: true, source: "services" });
 }
 
 function openQuickEditClientDialog() {
@@ -2593,7 +2638,7 @@ function openQuickEditEquipmentDialog() {
     showMessage("Seleccione un equipo", "Seleccione un equipo valido para editarlo.", "warning");
     return;
   }
-  openEquipmentDialog(equipmentId, { hideClient: true });
+  openEquipmentDialog(equipmentId, { hideClient: true, source: "services" });
 }
 
 function openQuickEditPartDialog() {
@@ -2706,18 +2751,13 @@ function getEquipmentFormData() {
 }
 
 function validateEquipment(data) {
-  if (!data.clientId) {
+  const requireClient = state.equipmentDialogSource !== "services";
+  if (requireClient && !data.clientId) {
     return { ok: false, message: "Debe seleccionar un cliente valido.", field: els.equipmentFields.client };
   }
   if (!data.type) {
     const field = cleanEquipmentType(els.equipmentFields.type.value) === "Otro" ? els.equipmentFields.otherType : els.equipmentFields.type;
     return { ok: false, message: "Debe indicar el tipo de equipo.", field };
-  }
-  if (!data.brand) {
-    return { ok: false, message: "Debe ingresar la marca.", field: els.equipmentFields.brand };
-  }
-  if (!data.model) {
-    return { ok: false, message: "Debe ingresar el modelo.", field: els.equipmentFields.model };
   }
   return { ok: true };
 }
@@ -4075,6 +4115,9 @@ function formatDateTime(value) {
 }
 
 function countServicesByStatus(status) {
+  if (state.dashboard?.statusCounts && status in state.dashboard.statusCounts) {
+    return String(state.dashboard.statusCounts[status]);
+  }
   return String(state.services.filter((service) => service.status === status).length);
 }
 
