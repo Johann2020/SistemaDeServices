@@ -931,7 +931,9 @@ function persistSettings() {
 
 function persistRemote(bucket, value) {
   clearRemotePage(bucket);
-  state.dashboard = null;
+  if (bucket !== "settings") {
+    state.dashboard = null;
+  }
   fetch(`/api/state/${bucket}`, {
     method: "PUT",
     credentials: "same-origin",
