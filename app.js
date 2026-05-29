@@ -1608,7 +1608,8 @@ function renderServices() {
   pageData.items.forEach((service) => {
     const client = clientsById.get(Number(service.clientId)) || service._client;
     const equipment = equipmentById.get(Number(service.equipmentId)) || service._equipment;
-    const failure = service.failure || "---";
+    const failure = serviceFailureSummary(service);
+    const failureTooltip = serviceFailureTooltip(service);
     const partsSummary = servicePartsSummary(service);
     const partsTooltip = servicePartsTooltip(service);
     const derivationSummary = serviceDerivationSummary(service);
@@ -1619,7 +1620,7 @@ function renderServices() {
       <td><span class="status-pill ${statusClass(service.status)}">${escapeHtml(displayServiceStatusLabel(service.status))}</span></td>
       <td class="linked-cell" data-open-client="${escapeHtml(client?.id || "")}" data-tooltip="${escapeHtml(clientTooltip(client))}"><strong>${escapeHtml(client?.name || "Sin cliente")}</strong></td>
       <td class="linked-cell" data-open-equipment="${escapeHtml(equipment?.id || "")}" data-tooltip="${escapeHtml(equipmentTooltip(equipment))}">${deviceLabelHtml(equipment)}</td>
-      <td class="tooltip-cell" data-tooltip="${escapeHtml(failure)}"><span class="cell-ellipsis">${escapeHtml(failure)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(failureTooltip)}"><span class="cell-ellipsis">${escapeHtml(failure || "---")}</span></td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(partsTooltip)}"><span class="cell-ellipsis">${escapeHtml(partsSummary || "---")}</span></td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(derivationTooltip)}"><span class="cell-ellipsis">${escapeHtml(derivationSummary || "---")}</span></td>
       <td>${dateWithAgeHtml(service.entryDate)}</td>
@@ -4553,6 +4554,32 @@ function partProductLabel(part) {
 
 function productToOption(product) {
   return `${productLabel(product)} - ${money(productFinalPrice(product))}`;
+}
+
+function serviceFailureItems(service) {
+  const issues = Array.isArray(service.issues) && service.issues.length
+    ? service.issues
+    : legacyIssuesFromFailure(service.failure);
+  const issueItems = issues.map((issue) => ({
+    label: issue.comment ? `${issue.description} (${issue.comment})` : issue.description,
+    prefix: "Falla",
+  }));
+  const workItems = (service.works || [])
+    .filter((work) => work.source === "requested")
+    .map((work) => ({ label: work.description, prefix: "Trabajo" }));
+  return [...issueItems, ...workItems].filter((item) => item.label);
+}
+
+function serviceFailureSummary(service) {
+  return serviceFailureItems(service)
+    .map((item) => item.label)
+    .join(" | ");
+}
+
+function serviceFailureTooltip(service) {
+  return serviceFailureItems(service)
+    .map((item) => `${item.prefix}: ${item.label}`)
+    .join("\n");
 }
 
 function servicePartsSummary(service) {
