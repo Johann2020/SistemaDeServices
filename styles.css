@@ -1913,6 +1913,37 @@ tbody tr.work-pending {
   border-radius: 13px;
 }
 
+.service-works-table {
+  table-layout: fixed;
+}
+
+.service-works-table th:nth-child(1),
+.service-works-table td:nth-child(1) {
+  width: 28%;
+}
+
+.service-works-table th:nth-child(2),
+.service-works-table td:nth-child(2) {
+  width: 84px;
+  text-align: center;
+}
+
+.service-works-table th:nth-child(3),
+.service-works-table td:nth-child(3) {
+  width: auto;
+}
+
+.service-works-table th:nth-child(4),
+.service-works-table td:nth-child(4) {
+  width: 120px;
+}
+
+.service-works-table th:nth-child(5),
+.service-works-table td:nth-child(5) {
+  width: 120px;
+  text-align: center;
+}
+
 .settings-grid .mini-table {
   margin-top: 8px;
   table-layout: fixed;
@@ -1972,6 +2003,23 @@ tbody tr.work-pending {
   min-height: 28px;
   padding: 0 8px;
   font-size: 13px;
+}
+
+.mini-table textarea {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 7px 8px;
+  font-size: 13px;
+  line-height: 1.35;
+  resize: vertical;
+  outline: 0;
+}
+
+.mini-table textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(30, 128, 177, 0.15);
 }
 
 .mini-table .quantity-stepper {

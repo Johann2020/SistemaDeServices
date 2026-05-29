@@ -1586,6 +1586,7 @@ function renderServices() {
     const client = clientsById.get(Number(service.clientId)) || service._client;
     const equipment = equipmentById.get(Number(service.equipmentId)) || service._equipment;
     const partsSummary = servicePartsSummary(service);
+    const worksSummary = serviceWorksSummary(service);
     const derivationSummary = serviceDerivationSummary(service);
     const text = normalizeSearch(
       [
@@ -1594,6 +1595,7 @@ function renderServices() {
         client?.name,
         equipmentLabel(equipment),
         service.failure,
+        worksSummary,
         partsSummary,
         derivationSummary,
         service.diagnosis,
@@ -1610,6 +1612,8 @@ function renderServices() {
     const equipment = equipmentById.get(Number(service.equipmentId)) || service._equipment;
     const failure = serviceFailureSummary(service);
     const failureTooltip = serviceFailureTooltip(service);
+    const worksSummary = serviceWorksSummary(service);
+    const worksTooltip = serviceWorksTooltip(service);
     const partsSummary = servicePartsSummary(service);
     const partsTooltip = servicePartsTooltip(service);
     const derivationSummary = serviceDerivationSummary(service);
@@ -1621,6 +1625,7 @@ function renderServices() {
       <td class="linked-cell" data-open-client="${escapeHtml(client?.id || "")}" data-tooltip="${escapeHtml(clientTooltip(client))}"><strong>${escapeHtml(client?.name || "Sin cliente")}</strong></td>
       <td class="linked-cell" data-open-equipment="${escapeHtml(equipment?.id || "")}" data-tooltip="${escapeHtml(equipmentTooltip(equipment))}">${deviceLabelHtml(equipment)}</td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(failureTooltip)}"><span class="cell-ellipsis">${escapeHtml(failure || "---")}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(worksTooltip)}"><span class="cell-ellipsis">${escapeHtml(worksSummary || "---")}</span></td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(partsTooltip)}"><span class="cell-ellipsis">${escapeHtml(partsSummary || "---")}</span></td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(derivationTooltip)}"><span class="cell-ellipsis">${escapeHtml(derivationSummary || "---")}</span></td>
       <td>${dateWithAgeHtml(service.entryDate)}</td>
@@ -3675,7 +3680,7 @@ function renderServiceWorks() {
         <span class="muted-line">${source}</span>
       </td>
       <td><input type="checkbox" data-work-done="${index}" ${work.done === false ? "" : "checked"}></td>
-      <td><input type="text" data-work-note="${index}" value="${escapeHtml(work.note || "")}" placeholder="${work.done === false ? "Motivo" : "Comentario"}"></td>
+      <td><textarea class="work-note-input" data-work-note="${index}" rows="2" placeholder="${work.done === false ? "Motivo" : "Comentario"}">${escapeHtml(work.note || "")}</textarea></td>
       <td><input class="price-input" type="text" inputmode="numeric" data-work-price="${index}" value="${escapeHtml(String(work.price || ""))}" placeholder="$ 0" ${work.done === false ? "disabled" : ""}></td>
       <td><button class="small-button delete" type="button" data-remove-work="${index}">Quitar</button></td>
     `;
@@ -4579,6 +4584,34 @@ function serviceFailureSummary(service) {
 function serviceFailureTooltip(service) {
   return serviceFailureItems(service)
     .map((item) => `${item.prefix}: ${item.label}`)
+    .join("\n");
+}
+
+function serviceWorksItems(service) {
+  return (service.works || [])
+    .filter((work) => work.description)
+    .map((work) => {
+      const done = work.done === false ? "No realizado" : "Realizado";
+      const noteLabel = work.done === false ? "Motivo" : "Comentario";
+      const note = work.note ? ` - ${noteLabel}: ${work.note}` : "";
+      const price = Number(work.price || 0);
+      const priceText = price ? ` - ${money(price)}` : "";
+      return {
+        label: work.description,
+        detail: `${done}: ${work.description}${note}${priceText}`,
+      };
+    });
+}
+
+function serviceWorksSummary(service) {
+  return serviceWorksItems(service)
+    .map((item) => item.label)
+    .join(" | ");
+}
+
+function serviceWorksTooltip(service) {
+  return serviceWorksItems(service)
+    .map((item) => item.detail)
     .join("\n");
 }
 
