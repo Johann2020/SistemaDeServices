@@ -402,6 +402,39 @@ def replace_text_recursive(value, search, replacement, path=None):
     return value, []
 
 
+def normalize_merge_text(value):
+    return " ".join(str(value or "").split()).casefold()
+
+
+def merge_text_recursive(value, canonical, aliases, path=None):
+    path = path or []
+    if isinstance(value, str):
+        if normalize_merge_text(value) in aliases and normalize_merge_text(value) != normalize_merge_text(canonical):
+            return canonical, [{
+                "path": path,
+                "before": value,
+                "after": canonical,
+            }]
+        return value, []
+    if isinstance(value, list):
+        changed = []
+        next_value = []
+        for index, item in enumerate(value):
+            replaced, diffs = merge_text_recursive(item, canonical, aliases, [*path, index])
+            next_value.append(replaced)
+            changed.extend(diffs)
+        return next_value, changed
+    if isinstance(value, dict):
+        changed = []
+        next_value = {}
+        for key, item in value.items():
+            replaced, diffs = merge_text_recursive(item, canonical, aliases, [*path, key])
+            next_value[key] = replaced
+            changed.extend(diffs)
+        return next_value, changed
+    return value, []
+
+
 def set_path_value(value, path, new_value):
     target = value
     for part in path[:-1]:
@@ -546,6 +579,72 @@ def replace_text_tool(user_id, search, replacement):
         if diffs:
             label = f'Reemplazo masivo: "{search}" por "{replacement}" ({len(diffs)} cambio(s))'
             action_id = create_undo_action(conn, user_id, label, {"type": "replace-text", "diffs": diffs})
+    return {"count": len(diffs), "items": changed_items, "undoId": action_id}
+
+
+def merge_values_tool(user_id, target, aliases):
+    target = str(target or "").strip()
+    aliases = [
+        normalize_merge_text(alias)
+        for alias in (aliases or [])
+        if str(alias or "").strip()
+    ]
+    aliases = [alias for alias in dict.fromkeys(aliases) if alias]
+    if not target:
+        raise PublicError("Debe indicar el valor canonico.")
+    if not aliases:
+        raise PublicError("Debe indicar al menos un valor equivalente.")
+
+    diffs = []
+    changed_items = 0
+    with connect() as conn:
+        for bucket in ITEM_BUCKETS:
+            items = read_bucket_list(conn, user_id, bucket)
+            bucket_changed = False
+            for index, item in enumerate(items):
+                if not isinstance(item, dict):
+                    continue
+                item_id_value = item_id(item)
+                replaced, item_diffs = merge_text_recursive(item, target, set(aliases))
+                if item_diffs:
+                    items[index] = replaced
+                    bucket_changed = True
+                    changed_items += 1
+                    for diff in item_diffs:
+                        diffs.append({
+                            "bucket": bucket,
+                            "itemId": item_id_value,
+                            **diff,
+                        })
+            if bucket_changed:
+                write_bucket_list(conn, user_id, bucket, items)
+                sync_bucket_items(conn, user_id, bucket, items)
+
+        settings = read_bucket_list(conn, user_id, "settings")
+        if not settings:
+            row = conn.execute(
+                "SELECT data FROM tenant_data WHERE user_id = ? AND bucket = 'settings'",
+                (user_id,),
+            ).fetchone()
+            settings = json.loads(row["data"]) if row else default_settings()
+        replaced_settings, settings_diffs = merge_text_recursive(settings, target, set(aliases))
+        if settings_diffs:
+            conn.execute(
+                """
+                INSERT INTO tenant_data (user_id, bucket, data, updated_at)
+                VALUES (?, 'settings', ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, bucket)
+                DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+                """,
+                (user_id, json.dumps(replaced_settings, ensure_ascii=False)),
+            )
+            for diff in settings_diffs:
+                diffs.append({"bucket": "settings", "itemId": None, **diff})
+
+        action_id = None
+        if diffs:
+            label = f'Unificacion de valores: "{target}" ({len(diffs)} cambio(s))'
+            action_id = create_undo_action(conn, user_id, label, {"type": "merge-values", "diffs": diffs})
     return {"count": len(diffs), "items": changed_items, "undoId": action_id}
 
 
@@ -1140,6 +1239,12 @@ class ServicesHandler(BaseHTTPRequestHandler):
             if self.command == "POST" and path == "/api/tools/replace-text":
                 body = self.read_json()
                 result = replace_text_tool(user["id"], body.get("search", ""), body.get("replacement", ""))
+                self.send_json(200, result)
+                return
+
+            if self.command == "POST" and path == "/api/tools/merge-values":
+                body = self.read_json()
+                result = merge_values_tool(user["id"], body.get("target", ""), body.get("aliases", []))
                 self.send_json(200, result)
                 return
 

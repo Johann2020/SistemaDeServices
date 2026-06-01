@@ -247,10 +247,13 @@ const els = {
     pickupDelayUnit: document.querySelector("#service-pickup-delay-unit"),
     replaceSearch: document.querySelector("#replace-search"),
     replaceValue: document.querySelector("#replace-value"),
+    mergeTarget: document.querySelector("#merge-target"),
+    mergeValues: document.querySelector("#merge-values"),
   },
   saveTransport: document.querySelector("#save-transport"),
   saveServiceDelays: document.querySelector("#save-service-delays"),
   runReplaceText: document.querySelector("#run-replace-text"),
+  runMergeValues: document.querySelector("#run-merge-values"),
   addMargin: document.querySelector("#add-margin"),
   addFrequentWork: document.querySelector("#add-frequent-work"),
   deleteOrphanClients: document.querySelector("#delete-orphan-clients"),
@@ -454,18 +457,18 @@ function wireEvents() {
   });
   els.productFields.type.addEventListener("focus", () => refreshProductTypeMenu(false));
   els.productFields.type.addEventListener("click", () => refreshProductTypeMenu(false));
-  els.productFields.type.addEventListener("keydown", handleProductTypeKeydown);
+  els.productFields.type.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshProductTypeMenu(true), hideProductTypeMenu, els.productTypeMenu));
   els.productFields.brand.addEventListener("input", () => {
     refreshProductBrandMenu(false);
     updateProductSuggestions();
   });
   els.productFields.brand.addEventListener("focus", () => refreshProductBrandMenu(false));
   els.productFields.brand.addEventListener("click", () => refreshProductBrandMenu(false));
-  els.productFields.brand.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshProductBrandMenu(true), hideProductBrandMenu));
+  els.productFields.brand.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshProductBrandMenu(true), hideProductBrandMenu, els.productBrandMenu));
   els.productFields.model.addEventListener("input", () => refreshProductModelMenu(false));
   els.productFields.model.addEventListener("focus", () => refreshProductModelMenu(false));
   els.productFields.model.addEventListener("click", () => refreshProductModelMenu(false));
-  els.productFields.model.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshProductModelMenu(true), hideProductModelMenu));
+  els.productFields.model.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshProductModelMenu(true), hideProductModelMenu, els.productModelMenu));
   els.productFields.cost.addEventListener("input", refreshProductFinalPrice);
   els.productFields.margin.addEventListener("input", refreshProductFinalPrice);
   [els.productFields.cost, els.productFields.margin, els.productFields.warrantyAmount].forEach(restrictInputToNumber);
@@ -478,7 +481,7 @@ function wireEvents() {
   });
   els.serviceFields.client.addEventListener("focus", () => refreshServiceClientMenu(false));
   els.serviceFields.client.addEventListener("click", () => refreshServiceClientMenu(false));
-  els.serviceFields.client.addEventListener("keydown", handleServiceClientKeydown);
+  els.serviceFields.client.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshServiceClientMenu(true), hideServiceClientMenu, els.serviceClientMenu));
   bindEnterToButton([els.serviceFields.issueDescription], els.addIssue);
   bindEnterToButton([els.serviceFields.requestedWorkDescription], els.addRequestedWork);
   bindEnterToButton([els.serviceFields.workDescription, els.serviceFields.workPrice, els.serviceFields.workTechnician], els.addWork);
@@ -507,6 +510,7 @@ function wireEvents() {
   els.saveTransport.addEventListener("click", saveTransportCost);
   els.saveServiceDelays?.addEventListener("click", saveServiceDelaySettings);
   els.runReplaceText?.addEventListener("click", runMassTextReplace);
+  els.runMergeValues?.addEventListener("click", runMassValueMerge);
   els.addMargin.addEventListener("click", addMargin);
   els.addFrequentWork.addEventListener("click", addFrequentWork);
   els.addTechnician?.addEventListener("click", addTechnician);
@@ -534,19 +538,21 @@ function wireEvents() {
   });
   els.equipmentFields.client.addEventListener("focus", () => refreshEquipmentClientMenu(false));
   els.equipmentFields.client.addEventListener("click", () => refreshEquipmentClientMenu(false));
-  els.equipmentFields.client.addEventListener("keydown", handleEquipmentClientKeydown);
+  els.equipmentFields.client.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshEquipmentClientMenu(true), hideEquipmentClientMenu, els.equipmentClientMenu));
   els.equipmentFields.brand.addEventListener("input", () => {
     refreshEquipmentBrandMenu(false);
     updateModelSuggestions();
   });
   els.equipmentFields.brand.addEventListener("focus", () => refreshEquipmentBrandMenu(false));
   els.equipmentFields.brand.addEventListener("click", () => refreshEquipmentBrandMenu(false));
-  els.equipmentFields.brand.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshEquipmentBrandMenu(true), hideEquipmentBrandMenu));
+  els.equipmentFields.brand.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshEquipmentBrandMenu(true), hideEquipmentBrandMenu, els.equipmentBrandMenu));
   els.equipmentFields.model.addEventListener("input", () => refreshEquipmentModelMenu(false));
   els.equipmentFields.model.addEventListener("focus", () => refreshEquipmentModelMenu(false));
   els.equipmentFields.model.addEventListener("click", () => refreshEquipmentModelMenu(false));
-  els.equipmentFields.model.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshEquipmentModelMenu(true), hideEquipmentModelMenu));
+  els.equipmentFields.model.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshEquipmentModelMenu(true), hideEquipmentModelMenu, els.equipmentModelMenu));
   els.serviceEquipmentTrigger.addEventListener("click", toggleServiceEquipmentMenu);
+  els.equipmentTypeTrigger.addEventListener("keydown", (event) => handleSuggestKeydown(event, openEquipmentTypeMenu, hideEquipmentTypeMenu, els.equipmentTypeMenu));
+  els.serviceEquipmentTrigger.addEventListener("keydown", (event) => handleSuggestKeydown(event, openServiceEquipmentMenu, hideServiceEquipmentMenu, els.serviceEquipmentMenu));
   els.patternGrid.addEventListener("pointerdown", startPatternDraw);
   els.patternGrid.addEventListener("pointermove", continuePatternDraw);
   els.patternGrid.addEventListener("pointerup", endPatternDraw);
@@ -978,8 +984,7 @@ function cleanPersistItem(item) {
 }
 
 function createRemoteItem(bucket, item) {
-  clearRemotePage(bucket);
-  state.dashboard = null;
+  clearRemotePagesForItemChange(bucket);
   return fetch(`/api/item/${bucket}`, {
     method: "POST",
     credentials: "same-origin",
@@ -1002,9 +1007,8 @@ function createRemoteItem(bucket, item) {
 }
 
 function persistRemoteItem(bucket, item) {
-  if (!item?.id) return Promise.resolve();
-  clearRemotePage(bucket);
-  state.dashboard = null;
+  if (!item?.id) return Promise.resolve(false);
+  clearRemotePagesForItemChange(bucket);
   return fetch(`/api/item/${bucket}/${encodeURIComponent(item.id)}`, {
     method: "PUT",
     credentials: "same-origin",
@@ -1014,18 +1018,20 @@ function persistRemoteItem(bucket, item) {
     },
     body: JSON.stringify(cleanPersistItem(item)),
   })
-    .then((response) => {
-      if (!response.ok) throw new Error("No se pudo sincronizar con la nube");
-      return refreshDashboard();
+    .then(async (response) => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "No se pudo sincronizar con la nube");
+      await refreshDashboard();
+      return true;
     })
-    .catch(() => {
-      showToast("No se pudo sincronizar con la nube", { type: "error" });
+    .catch((error) => {
+      showToast(error.message || "No se pudo sincronizar con la nube", { type: "error" });
+      return false;
     });
 }
 
 function deleteRemoteItem(bucket, id) {
-  clearRemotePage(bucket);
-  state.dashboard = null;
+  clearRemotePagesForItemChange(bucket);
   return fetch(`/api/item/${bucket}/${encodeURIComponent(id)}`, {
     method: "DELETE",
     credentials: "same-origin",
@@ -1033,12 +1039,15 @@ function deleteRemoteItem(bucket, id) {
       ...(state.csrfToken ? { "X-CSRF-Token": state.csrfToken } : {}),
     },
   })
-    .then((response) => {
-      if (!response.ok) throw new Error("No se pudo sincronizar con la nube");
-      return refreshDashboard();
+    .then(async (response) => {
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "No se pudo sincronizar con la nube");
+      await refreshDashboard();
+      return true;
     })
-    .catch(() => {
-      showToast("No se pudo sincronizar con la nube", { type: "error" });
+    .catch((error) => {
+      showToast(error.message || "No se pudo sincronizar con la nube", { type: "error" });
+      return false;
     });
 }
 
@@ -1122,6 +1131,7 @@ function resetTablePage(type) {
 
 function clearRemotePage(type) {
   delete state.remotePages[type];
+  delete state.remotePageRequests[type];
 }
 
 function clearRemotePages() {
@@ -1300,6 +1310,18 @@ function upsertStateItem(type, item) {
     const pageIndex = page.items?.findIndex((entry) => Number(entry.id) === Number(item.id));
     if (pageIndex >= 0) page.items[pageIndex] = item;
   });
+}
+
+function clearRemotePagesForItemChange(type) {
+  clearRemotePage(type);
+  if (type === "clients") {
+    clearRemotePage("equipment");
+    clearRemotePage("services");
+  }
+  if (type === "equipment" || type === "products") {
+    clearRemotePage("services");
+  }
+  state.dashboard = null;
 }
 
 function removeStateItem(type, id) {
@@ -1952,7 +1974,12 @@ async function changeServiceStatus(id, newStatus, seed = null) {
   const updated = { ...previous, status: newStatus, ...dates };
   if (state.remoteEnabled) {
     upsertStateItem("services", updated);
-    await persistRemoteItem("services", updated);
+    const saved = await persistRemoteItem("services", updated);
+    if (!saved) {
+      upsertStateItem("services", previous);
+      renderAll();
+      return;
+    }
   } else {
     const snapshot = snapshotData();
     state.services = state.services.map((s) =>
@@ -2416,6 +2443,69 @@ async function runMassTextReplace() {
   }
 }
 
+async function runMassValueMerge() {
+  const target = els.settingsFields.mergeTarget?.value.trim() || "";
+  const aliases = String(els.settingsFields.mergeValues?.value || "")
+    .split(/[|,;\n]/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (!target || aliases.length === 0) {
+    showToast("Indique un valor canonico y al menos un equivalente", { type: "error" });
+    els.settingsFields.mergeTarget?.focus();
+    return;
+  }
+
+  const confirmed = await showMessage(
+    "Unificar valores",
+    `Se unificara todo lo que coincida con: ${aliases.join(", ")}\n\nValor canonico: ${target}\n\nDesea continuar?`,
+    "warning",
+    "confirm"
+  );
+  if (!confirmed) return;
+
+  if (!state.remoteEnabled) {
+    const snapshot = snapshotData();
+    const buckets = ["clients", "equipment", "products", "services"];
+    let count = 0;
+    buckets.forEach((bucket) => {
+      state[bucket] = mergeTextValuesInObject(state[bucket], target, aliases, () => count += 1);
+    });
+    state.settings = mergeTextValuesInObject(state.settings, target, aliases, () => count += 1);
+    persistClients();
+    persistEquipment();
+    persistProducts();
+    persistServices();
+    persistSettings();
+    renderAll();
+    els.settingsFields.mergeTarget.value = "";
+    els.settingsFields.mergeValues.value = "";
+    showToast(`${count} cambio(s) realizados`, {
+      actionLabel: "Deshacer",
+      onAction: () => restoreSnapshot(snapshot),
+    });
+    return;
+  }
+
+  try {
+    const result = await fetchJson("/api/tools/merge-values", {
+      method: "POST",
+      body: JSON.stringify({ target, aliases }),
+    });
+    els.settingsFields.mergeTarget.value = "";
+    els.settingsFields.mergeValues.value = "";
+    clearRemotePages();
+    await initializeRemoteState();
+    renderAll();
+    showToast(result.count ? `${result.count} cambio(s) realizados` : "No se encontraron coincidencias", {
+      actionLabel: result.undoId ? "Deshacer" : undefined,
+      onAction: result.undoId ? () => undoHistoryAction(result.undoId) : undefined,
+    });
+  } catch (error) {
+    showToast(error.message || "No se pudo unificar los valores", { type: "error" });
+  }
+}
+
 function replaceTextInObject(value, search, replacement, onChange) {
   if (typeof value === "string") {
     if (!value.includes(search)) return value;
@@ -2428,6 +2518,26 @@ function replaceTextInObject(value, search, replacement, onChange) {
   if (value && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [key, replaceTextInObject(item, search, replacement, onChange)])
+    );
+  }
+  return value;
+}
+
+function mergeTextValuesInObject(value, canonical, aliases, onChange) {
+  const normalizedAliases = new Set(aliases.map((item) => normalizeSearch(item)).filter(Boolean));
+  const normalizedCanonical = normalizeSearch(canonical);
+  if (typeof value === "string") {
+    const normalized = normalizeSearch(value);
+    if (!normalized || !normalizedAliases.has(normalized) || normalized === normalizedCanonical) return value;
+    onChange();
+    return canonical;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => mergeTextValuesInObject(item, canonical, aliases, onChange));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [key, mergeTextValuesInObject(item, canonical, aliases, onChange)])
     );
   }
   return value;
@@ -2599,7 +2709,8 @@ async function saveProduct(event) {
   if (state.remoteEnabled) {
     if (state.editingProductId) {
       upsertStateItem("products", savedProduct);
-      await persistRemoteItem("products", savedProduct);
+      const saved = await persistRemoteItem("products", savedProduct);
+      if (!saved) return;
     } else {
       const created = await createRemoteItem("products", savedProduct);
       if (!created) return;
@@ -2680,7 +2791,12 @@ async function deleteProduct(id) {
 
   if (state.remoteEnabled) {
     removeStateItem("products", id);
-    await deleteRemoteItem("products", id);
+    const deleted = await deleteRemoteItem("products", id);
+    if (!deleted) {
+      upsertStateItem("products", product);
+      renderAll();
+      return;
+    }
   } else {
     state.products = state.products.filter((item) => item.id !== id);
     persistProducts();
@@ -2735,6 +2851,7 @@ function refreshProductTypeMenu(showAll = false) {
   els.productTypeMenu.querySelectorAll("[data-product-type-option]").forEach((button) => {
     button.addEventListener("pointerdown", keepComboInteraction);
     button.addEventListener("mousedown", keepComboInteraction);
+    button.addEventListener("mouseenter", () => setComboMenuActive(els.productTypeMenu, [...els.productTypeMenu.querySelectorAll("button")].indexOf(button)));
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       els.productFields.type.value = button.dataset.productTypeOption;
@@ -2745,6 +2862,8 @@ function refreshProductTypeMenu(showAll = false) {
       refreshProductBrandMenu(true);
     });
   });
+  if (matches.length > 0) primeComboMenuActive(els.productTypeMenu);
+  else clearComboMenuActive(els.productTypeMenu);
 }
 
 function productTypeMenuButtonHtml(type) {
@@ -2765,10 +2884,85 @@ function hideProductTypeMenuOnOutsideClick(event) {
   hideProductTypeMenu();
 }
 
-function handleSuggestKeydown(event, showAll, hide) {
-  if (event.key === "ArrowDown") {
+function comboMenuButtons(menu) {
+  return menu ? [...menu.querySelectorAll("button")] : [];
+}
+
+function comboMenuActiveIndex(menu) {
+  const index = Number(menu?.dataset?.activeIndex);
+  return Number.isFinite(index) ? index : -1;
+}
+
+function clearComboMenuActive(menu) {
+  if (!menu) return;
+  delete menu.dataset.activeIndex;
+  comboMenuButtons(menu).forEach((button) => button.classList.remove("active"));
+}
+
+function setComboMenuActive(menu, index) {
+  if (!menu) return false;
+  const buttons = comboMenuButtons(menu);
+  if (!buttons.length) {
+    clearComboMenuActive(menu);
+    return false;
+  }
+  const next = ((Number(index) % buttons.length) + buttons.length) % buttons.length;
+  buttons.forEach((button, buttonIndex) => button.classList.toggle("active", buttonIndex === next));
+  menu.dataset.activeIndex = String(next);
+  buttons[next]?.scrollIntoView({ block: "nearest" });
+  return true;
+}
+
+function primeComboMenuActive(menu) {
+  if (!menu) return false;
+  const buttons = comboMenuButtons(menu);
+  if (!buttons.length) return false;
+  const selectedIndex = buttons.findIndex((button) => button.classList.contains("selected"));
+  return setComboMenuActive(menu, selectedIndex >= 0 ? selectedIndex : 0);
+}
+
+function moveComboMenuActive(menu, step) {
+  if (!menu) return false;
+  const buttons = comboMenuButtons(menu);
+  if (!buttons.length) return false;
+  let index = comboMenuActiveIndex(menu);
+  if (index < 0) index = step > 0 ? 0 : buttons.length - 1;
+  else index = index + step;
+  if (index < 0) index = buttons.length - 1;
+  if (index >= buttons.length) index = 0;
+  return setComboMenuActive(menu, index);
+}
+
+function pickComboMenuActive(menu) {
+  if (!menu) return false;
+  const buttons = comboMenuButtons(menu);
+  if (!buttons.length) return false;
+  const index = comboMenuActiveIndex(menu) >= 0 ? comboMenuActiveIndex(menu) : 0;
+  buttons[index]?.click();
+  return true;
+}
+
+function handleSuggestKeydown(event, showAll, hide, menu) {
+  const visible = !!menu?.classList.contains("visible");
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
     event.preventDefault();
-    showAll();
+    if (!visible) {
+      showAll();
+      if (menu) {
+        const buttons = comboMenuButtons(menu);
+        if (buttons.length) {
+          setComboMenuActive(menu, event.key === "ArrowUp" ? buttons.length - 1 : 0);
+        }
+      }
+      return;
+    }
+    moveComboMenuActive(menu, event.key === "ArrowDown" ? 1 : -1);
+    return;
+  }
+  if (event.key === "Enter" && visible) {
+    event.preventDefault();
+    pickComboMenuActive(menu);
+    return;
   }
   if (event.key === "Escape") {
     hide();
@@ -2787,11 +2981,14 @@ function renderSuggestionMenu(menu, items, onPick) {
   menu.querySelectorAll("[data-suggest-index]").forEach((button) => {
     button.addEventListener("pointerdown", keepComboInteraction);
     button.addEventListener("mousedown", keepComboInteraction);
+    button.addEventListener("mouseenter", () => setComboMenuActive(menu, Number(button.dataset.suggestIndex)));
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       onPick(items[Number(button.dataset.suggestIndex)].value);
     });
   });
+  if (items.length > 0) primeComboMenuActive(menu);
+  else clearComboMenuActive(menu);
 }
 
 function productBrandOptions() {
@@ -2988,7 +3185,7 @@ function closeClientDialog() {
   els.dialog.close();
 }
 
-function saveClient(event) {
+async function saveClient(event) {
   event.preventDefault();
   els.error.textContent = "";
 
@@ -3001,20 +3198,46 @@ function saveClient(event) {
   }
 
   let savedId = state.editingId;
+  let savedClient = null;
   if (state.editingId) {
-    state.clients = state.clients.map((client) =>
-      client.id === state.editingId ? { ...client, ...data } : client
-    );
+    const previous = getClientRecord(state.editingId);
+    if (!previous) {
+      els.error.textContent = "No se pudo encontrar el cliente seleccionado. Actualice la lista e intente nuevamente.";
+      return;
+    }
+    savedClient = { ...previous, ...data, id: state.editingId };
   } else {
-    savedId = nextClientId();
-    state.clients.push({
-      id: savedId,
+    savedClient = {
+      id: state.remoteEnabled ? 0 : nextClientId(),
       ...data,
       createdAt: new Date().toISOString(),
-    });
+    };
+    savedId = savedClient.id;
   }
 
-  persistClients();
+  if (state.remoteEnabled) {
+    if (state.editingId) {
+      upsertStateItem("clients", savedClient);
+      const saved = await persistRemoteItem("clients", savedClient);
+      if (!saved) return;
+    } else {
+      const created = await createRemoteItem("clients", savedClient);
+      if (!created) return;
+      savedClient = created;
+      savedId = created.id;
+      upsertStateItem("clients", created);
+    }
+  } else {
+    if (state.editingId) {
+      state.clients = state.clients.map((client) =>
+        client.id === state.editingId ? savedClient : client
+      );
+    } else {
+      state.clients.push(savedClient);
+    }
+    persistClients();
+  }
+
   state.selectedRow = { type: "clients", id: savedId };
   renderAll();
   showToast(state.editingId ? "Cliente actualizado" : "Cliente agregado");
@@ -3277,7 +3500,7 @@ function addCurrentWorkToPreset() {
   showMessage("Trabajo guardado", "El trabajo fue agregado a predeterminados.", "info");
 }
 
-function saveEquipment(event) {
+async function saveEquipment(event) {
   event.preventDefault();
   els.equipmentError.textContent = "";
 
@@ -3290,20 +3513,46 @@ function saveEquipment(event) {
   }
 
   let savedId = state.editingEquipmentId;
+  let savedEquipment = null;
   if (state.editingEquipmentId) {
-    state.equipment = state.equipment.map((equipment) =>
-      equipment.id === state.editingEquipmentId ? { ...equipment, ...data } : equipment
-    );
+    const previous = getEquipmentById(state.editingEquipmentId);
+    if (!previous) {
+      els.equipmentError.textContent = "No se pudo encontrar el equipo seleccionado. Actualice la lista e intente nuevamente.";
+      return;
+    }
+    savedEquipment = { ...previous, ...data, id: state.editingEquipmentId };
   } else {
-    savedId = nextEquipmentId();
-    state.equipment.push({
-      id: savedId,
+    savedEquipment = {
+      id: state.remoteEnabled ? 0 : nextEquipmentId(),
       ...data,
       createdAt: new Date().toISOString(),
-    });
+    };
+    savedId = savedEquipment.id;
   }
 
-  persistEquipment();
+  if (state.remoteEnabled) {
+    if (state.editingEquipmentId) {
+      upsertStateItem("equipment", savedEquipment);
+      const saved = await persistRemoteItem("equipment", savedEquipment);
+      if (!saved) return;
+    } else {
+      const created = await createRemoteItem("equipment", savedEquipment);
+      if (!created) return;
+      savedEquipment = created;
+      savedId = created.id;
+      upsertStateItem("equipment", created);
+    }
+  } else {
+    if (state.editingEquipmentId) {
+      state.equipment = state.equipment.map((equipment) =>
+        equipment.id === state.editingEquipmentId ? savedEquipment : equipment
+      );
+    } else {
+      state.equipment.push(savedEquipment);
+    }
+    persistEquipment();
+  }
+
   state.selectedRow = { type: "equipment", id: savedId };
   keepSavedEquipmentVisible(savedId);
   renderAll();
@@ -3493,7 +3742,8 @@ async function saveService(event) {
   if (state.remoteEnabled) {
     if (state.editingServiceId) {
       upsertStateItem("services", savedService);
-      await persistRemoteItem("services", savedService);
+      const saved = await persistRemoteItem("services", savedService);
+      if (!saved) return;
     } else {
       const created = await createRemoteItem("services", savedService);
       if (!created) return;
@@ -3883,6 +4133,12 @@ function renderServiceWorks() {
       ? (isIssueWork ? "No solucionado" : "No realizado")
       : (isIssueWork ? "Solucionado" : "Realizado");
     const technicianOptions = technicianSelectOptions(work.technician || "");
+    const technicianCell = isIssueWork
+      ? `<span class="not-applicable">---</span>`
+      : `<select data-work-technician="${index}">${technicianOptions}</select>`;
+    const priceCell = isIssueWork
+      ? `<span class="not-applicable">---</span>`
+      : `<input class="price-input" type="text" inputmode="numeric" data-work-price="${index}" value="${escapeHtml(String(work.price || ""))}" placeholder="$ 0" ${work.done === false ? "disabled" : ""}>`;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>
@@ -3901,8 +4157,8 @@ function renderServiceWorks() {
         </label>
       </td>
       <td><textarea data-work-note="${index}" placeholder="${work.done === false ? "Motivo" : "Comentario"}">${escapeHtml(work.note || "")}</textarea></td>
-      <td><select data-work-technician="${index}">${technicianOptions}</select></td>
-      <td><input class="price-input" type="text" inputmode="numeric" data-work-price="${index}" value="${escapeHtml(String(work.price || ""))}" placeholder="$ 0" ${work.done === false ? "disabled" : ""}></td>
+      <td>${technicianCell}</td>
+      <td>${priceCell}</td>
       <td><button class="small-button delete" type="button" data-remove-work="${index}">Quitar</button></td>
     `;
     els.serviceWorksBody.appendChild(tr);
@@ -4169,6 +4425,7 @@ function renderServiceEquipmentPicker(equipment) {
   els.serviceEquipmentMenu.querySelectorAll("[data-service-equipment]").forEach((button) => {
     button.addEventListener("pointerdown", keepComboInteraction);
     button.addEventListener("mousedown", keepComboInteraction);
+    button.addEventListener("mouseenter", () => setComboMenuActive(els.serviceEquipmentMenu, [...els.serviceEquipmentMenu.querySelectorAll("button")].indexOf(button)));
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       els.serviceFields.equipment.value = button.dataset.serviceEquipment;
@@ -4190,6 +4447,9 @@ function syncServiceEquipmentPicker() {
   els.serviceEquipmentMenu.querySelectorAll("[data-service-equipment]").forEach((button) => {
     button.classList.toggle("selected", button.dataset.serviceEquipment === String(els.serviceFields.equipment.value));
   });
+  if (els.serviceEquipmentMenu.classList.contains("visible")) {
+    primeComboMenuActive(els.serviceEquipmentMenu);
+  }
 }
 
 function serviceEquipmentPlaceholder(clientId, hasEquipment) {
@@ -4210,6 +4470,15 @@ function toggleServiceEquipmentMenu(event) {
   event.stopPropagation();
   if (els.serviceEquipmentTrigger.disabled) return;
   els.serviceEquipmentMenu.classList.toggle("visible");
+  if (els.serviceEquipmentMenu.classList.contains("visible")) {
+    primeComboMenuActive(els.serviceEquipmentMenu);
+  }
+}
+
+function openServiceEquipmentMenu() {
+  if (els.serviceEquipmentTrigger.disabled) return;
+  els.serviceEquipmentMenu.classList.add("visible");
+  primeComboMenuActive(els.serviceEquipmentMenu);
 }
 
 function hideServiceEquipmentMenu() {
@@ -4268,7 +4537,12 @@ async function deleteService(id) {
 
   if (state.remoteEnabled) {
     removeStateItem("services", id);
-    await deleteRemoteItem("services", id);
+    const deleted = await deleteRemoteItem("services", id);
+    if (!deleted) {
+      upsertStateItem("services", service);
+      renderAll();
+      return;
+    }
   } else {
     state.services = state.services.filter((item) => item.id !== id);
     persistServices();
@@ -4346,6 +4620,7 @@ function renderEquipmentTypePicker() {
   els.equipmentTypeMenu.querySelectorAll("[data-equipment-type]").forEach((button) => {
     button.addEventListener("pointerdown", keepComboInteraction);
     button.addEventListener("mousedown", keepComboInteraction);
+    button.addEventListener("mouseenter", () => setComboMenuActive(els.equipmentTypeMenu, [...els.equipmentTypeMenu.querySelectorAll("button")].indexOf(button)));
     button.addEventListener("click", (event) => {
       event.stopPropagation();
       els.equipmentFields.type.value = button.dataset.equipmentType;
@@ -4356,9 +4631,17 @@ function renderEquipmentTypePicker() {
   syncEquipmentTypePicker();
 }
 
+function openEquipmentTypeMenu() {
+  els.equipmentTypeMenu.classList.add("visible");
+  primeComboMenuActive(els.equipmentTypeMenu);
+}
+
 function toggleEquipmentTypeMenu(event) {
   event.stopPropagation();
   els.equipmentTypeMenu.classList.toggle("visible");
+  if (els.equipmentTypeMenu.classList.contains("visible")) {
+    primeComboMenuActive(els.equipmentTypeMenu);
+  }
 }
 
 function hideEquipmentTypeMenu() {
@@ -4377,15 +4660,8 @@ function syncEquipmentTypePicker() {
   els.equipmentTypeMenu.querySelectorAll("[data-equipment-type]").forEach((button) => {
     button.classList.toggle("selected", button.dataset.equipmentType === type);
   });
-}
-
-function handleEquipmentClientKeydown(event) {
-  if (event.key === "ArrowDown") {
-    event.preventDefault();
-    refreshEquipmentClientMenu(true);
-  }
-  if (event.key === "Escape") {
-    hideEquipmentClientMenu();
+  if (els.equipmentTypeMenu.classList.contains("visible")) {
+    primeComboMenuActive(els.equipmentTypeMenu);
   }
 }
 
@@ -4554,10 +4830,12 @@ function getCurrentEquipmentType() {
 
 function startPatternDraw(event) {
   event.preventDefault();
+  const firstDot = getPatternDotAtPoint(event.clientX, event.clientY);
+  if (!firstDot) return;
   state.pattern = [];
   state.drawingPattern = true;
   els.patternGrid.setPointerCapture(event.pointerId);
-  addPatternDotFromPoint(event.clientX, event.clientY);
+  addPatternDot(firstDot);
 }
 
 function continuePatternDraw(event) {
@@ -4577,6 +4855,10 @@ function endPatternDraw(event) {
 function addPatternDotFromPoint(clientX, clientY) {
   const button = getPatternDotAtPoint(clientX, clientY);
   if (!button) return;
+  addPatternDot(button);
+}
+
+function addPatternDot(button) {
   const dot = Number(button.dataset.dot);
   if (!state.pattern.includes(dot)) state.pattern.push(dot);
   renderPattern();
@@ -4584,7 +4866,13 @@ function addPatternDotFromPoint(clientX, clientY) {
 
 function renderPattern() {
   els.patternGrid.querySelectorAll("button").forEach((button) => {
-    button.classList.toggle("selected", state.pattern.includes(Number(button.dataset.dot)));
+    const dot = Number(button.dataset.dot);
+    const isStart = state.pattern[0] === dot;
+    button.classList.toggle("selected", state.pattern.includes(dot));
+    button.classList.toggle("start", isStart);
+    button.textContent = isStart ? "I" : "";
+    button.dataset.tooltip = isStart ? "Inicio del patron" : "";
+    button.setAttribute("aria-label", isStart ? "Inicio del patron" : `Punto ${dot + 1}`);
   });
 
   els.patternLines.innerHTML = "";
@@ -4700,7 +4988,10 @@ function miniPatternHtml(pattern) {
   const dots = Array.from({ length: 9 }, (_, index) => {
     const point = miniPatternPoint(index);
     const active = points.includes(index) ? " active" : "";
-    return `<circle class="mini-pattern-dot${active}" cx="${point.x}" cy="${point.y}" r="4"></circle>`;
+    const start = points[0] === index
+      ? `<text class="mini-pattern-start" x="${point.x}" y="${point.y + 2}" text-anchor="middle">I</text>`
+      : "";
+    return `<circle class="mini-pattern-dot${active}" cx="${point.x}" cy="${point.y}" r="4"></circle>${start}`;
   }).join("");
   return `<svg class="mini-pattern" viewBox="0 0 56 56" aria-label="Patron">${lines.join("")}${dots}</svg>`;
 }
@@ -4921,7 +5212,8 @@ function servicePartsTooltip(service) {
 }
 
 function serviceWorksTotal(service) {
-  return (service.works || []).reduce((sum, work) => sum + Number(work.price || 0), 0);
+  return (service.works || []).reduce((sum, work) =>
+    sum + (work.source === "issue" ? 0 : Number(work.price || 0)), 0);
 }
 
 function servicePartsTotal(service) {
