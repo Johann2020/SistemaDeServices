@@ -120,6 +120,7 @@ def default_settings():
         "transportCost": 0,
         "margins": [],
         "frequentWorks": [],
+        "technicians": [],
         "serviceFilters": {"all": True, "statuses": []},
     }
 
