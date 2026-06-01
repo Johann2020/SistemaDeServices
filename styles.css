@@ -910,6 +910,65 @@ table {
   width: 4.9%;
 }
 
+@media (max-width: 1919px) {
+  #services-view table {
+    min-width: 0;
+  }
+
+  #services-view th:nth-child(5),
+  #services-view td:nth-child(5),
+  #services-view th:nth-child(7),
+  #services-view td:nth-child(7),
+  #services-view th:nth-child(8),
+  #services-view td:nth-child(8) {
+    display: none;
+  }
+
+  #services-view th:nth-child(1),
+  #services-view td:nth-child(1) {
+    width: 4%;
+  }
+
+  #services-view th:nth-child(2),
+  #services-view td:nth-child(2) {
+    width: 9%;
+  }
+
+  #services-view th:nth-child(3),
+  #services-view td:nth-child(3) {
+    width: 14%;
+  }
+
+  #services-view th:nth-child(4),
+  #services-view td:nth-child(4) {
+    width: 20%;
+  }
+
+  #services-view th:nth-child(6),
+  #services-view td:nth-child(6) {
+    width: 20%;
+  }
+
+  #services-view th:nth-child(9),
+  #services-view td:nth-child(9),
+  #services-view th:nth-child(10),
+  #services-view td:nth-child(10),
+  #services-view th:nth-child(11),
+  #services-view td:nth-child(11) {
+    width: 9%;
+  }
+
+  #services-view th:nth-child(12),
+  #services-view td:nth-child(12) {
+    width: 6%;
+  }
+
+  #services-view .status-pill {
+    min-width: 104px;
+    font-size: 12px;
+  }
+}
+
 #equipment-view th,
 #equipment-view td {
   width: 12.5%;
