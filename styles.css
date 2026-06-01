@@ -1473,17 +1473,8 @@ tbody tr.work-pending {
   padding-bottom: 8px;
 }
 
-#equipment-dialog form > .form-grid:first-of-type {
-  overflow: visible;
-}
-
-#equipment-dialog,
-#equipment-dialog form {
-  overflow: visible;
-}
-
 #equipment-dialog .icon-select-menu {
-  max-height: none;
+  max-height: min(360px, calc(100dvh - 190px));
   z-index: 400;
 }
 
@@ -2071,6 +2062,50 @@ tbody tr.work-pending {
   font-weight: 600;
 }
 
+.pattern-field {
+  grid-column: 1 / -1;
+}
+
+.pattern-compact {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 7px 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #f8fafc;
+}
+
+.pattern-compact #pattern-summary {
+  flex: 1;
+  min-width: 0;
+  color: #526378;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pattern-compact .ghost-button {
+  width: auto;
+  min-height: 30px;
+  white-space: nowrap;
+}
+
+.pattern-dialog {
+  width: min(380px, calc(100vw - 24px));
+}
+
+.pattern-dialog form {
+  overflow: visible;
+}
+
+.pattern-dialog-body {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: 18px;
+}
+
 .pattern-grid {
   position: relative;
   width: 230px;
@@ -2161,6 +2196,10 @@ tbody tr.work-pending {
 
 .compact {
   min-height: 32px;
+  width: 230px;
+}
+
+.pattern-dialog .compact {
   width: 230px;
 }
 
@@ -3073,6 +3112,178 @@ tbody tr.work-pending {
   #services-view th:nth-child(6),
   #services-view td:nth-child(6) {
     width: 11%;
+  }
+
+  .client-dialog {
+    width: min(700px, calc(100vw - 18px));
+    max-height: calc(100dvh - 16px);
+  }
+
+  .client-dialog form {
+    max-height: calc(100dvh - 16px);
+  }
+
+  .dialog-banner {
+    min-height: 46px;
+    padding: 0 14px;
+    font-size: 14px;
+  }
+
+  .dialog-banner h2 {
+    font-size: 18px;
+  }
+
+  .dialog-close {
+    width: 34px;
+    height: 34px;
+  }
+
+  .form-grid {
+    gap: 10px 12px;
+    padding: 12px 14px;
+  }
+
+  .form-grid label,
+  .form-grid .form-field {
+    gap: 5px;
+    font-size: 12px;
+  }
+
+  .form-grid input,
+  .form-grid select,
+  .form-grid textarea {
+    min-height: 34px;
+    padding: 7px 9px;
+    font-size: 12px;
+  }
+
+  .form-grid textarea {
+    min-height: 58px;
+  }
+
+  .icon-select,
+  .embedded-combo {
+    min-height: 34px;
+  }
+
+  .icon-select-trigger,
+  .embedded-combo input {
+    min-height: 32px;
+    font-size: 12px;
+  }
+
+  .pattern-field {
+    gap: 7px;
+    font-size: 12px;
+  }
+
+  .pattern-compact {
+    min-height: 34px;
+    padding: 5px 6px 5px 9px;
+  }
+
+  .pattern-compact #pattern-summary {
+    font-size: 12px;
+  }
+
+  .pattern-compact .ghost-button {
+    min-height: 28px;
+    font-size: 11.5px;
+  }
+
+  .pattern-grid {
+    width: 176px;
+    gap: 18px;
+    padding: 20px;
+  }
+
+  .pattern-grid button.start {
+    font-size: 15px;
+  }
+
+  .pattern-lines line {
+    stroke-width: 4;
+  }
+
+  .dialog-actions {
+    gap: 8px;
+    padding: 10px 14px 12px;
+  }
+
+  .primary-action,
+  .danger-action,
+  .secondary-action {
+    min-height: 34px;
+    padding: 0 14px;
+    font-size: 12.5px;
+  }
+}
+
+@media (max-height: 760px) {
+  .client-dialog {
+    max-height: calc(100dvh - 10px);
+  }
+
+  .client-dialog form {
+    max-height: calc(100dvh - 10px);
+  }
+
+  .dialog-banner {
+    min-height: 42px;
+  }
+
+  .dialog-banner h2 {
+    font-size: 17px;
+  }
+
+  .form-grid {
+    gap: 8px 10px;
+    padding: 10px 12px;
+  }
+
+  .form-grid label,
+  .form-grid .form-field {
+    gap: 4px;
+    font-size: 11.5px;
+  }
+
+  .form-grid input,
+  .form-grid select,
+  .form-grid textarea {
+    min-height: 31px;
+    padding: 6px 8px;
+    font-size: 11.5px;
+  }
+
+  .form-grid textarea {
+    min-height: 52px;
+  }
+
+  .pattern-grid {
+    width: 154px;
+    gap: 15px;
+    padding: 18px;
+  }
+
+  .pattern-dialog-body {
+    padding: 12px;
+  }
+
+  .pattern-dialog .compact {
+    width: 154px;
+  }
+
+  .pattern-lines line {
+    stroke-width: 4;
+  }
+
+  .ghost-button.compact {
+    min-height: 31px;
+    font-size: 11.5px;
+  }
+
+  .dialog-actions {
+    padding: 8px 12px 10px;
   }
 }
 

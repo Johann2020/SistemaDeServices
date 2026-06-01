@@ -599,19 +599,10 @@
           </label>
           <div id="pattern-wrap" class="pattern-field">
             <span>Patron de desbloqueo</span>
-            <div class="pattern-grid" id="pattern-grid" aria-label="Patron de desbloqueo">
-              <svg class="pattern-lines" id="pattern-lines" viewBox="0 0 230 230" aria-hidden="true"></svg>
-              <button type="button" data-dot="0"></button>
-              <button type="button" data-dot="1"></button>
-              <button type="button" data-dot="2"></button>
-              <button type="button" data-dot="3"></button>
-              <button type="button" data-dot="4"></button>
-              <button type="button" data-dot="5"></button>
-              <button type="button" data-dot="6"></button>
-              <button type="button" data-dot="7"></button>
-              <button type="button" data-dot="8"></button>
+            <div class="pattern-compact">
+              <span id="pattern-summary">Sin patron cargado</span>
+              <button class="ghost-button compact" type="button" id="open-pattern-dialog">Establecer patron de desbloqueo</button>
             </div>
-            <button class="ghost-button compact" type="button" id="clear-pattern">Limpiar patron</button>
           </div>
         </div>
 
@@ -620,6 +611,34 @@
         <div class="dialog-actions">
           <button class="primary-action" type="submit" id="save-equipment">Aceptar</button>
           <button class="danger-button" type="button" id="cancel-equipment-dialog">Cancelar</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog class="client-dialog pattern-dialog" id="pattern-dialog">
+      <form method="dialog" id="pattern-form">
+        <div class="dialog-banner">
+          <h2>Patron de desbloqueo</h2>
+          <button class="dialog-close" type="button" id="close-pattern-dialog" aria-label="Cerrar">×</button>
+        </div>
+        <div class="pattern-dialog-body">
+          <div class="pattern-grid" id="pattern-grid" aria-label="Patron de desbloqueo">
+            <svg class="pattern-lines" id="pattern-lines" viewBox="0 0 230 230" aria-hidden="true"></svg>
+            <button type="button" data-dot="0"></button>
+            <button type="button" data-dot="1"></button>
+            <button type="button" data-dot="2"></button>
+            <button type="button" data-dot="3"></button>
+            <button type="button" data-dot="4"></button>
+            <button type="button" data-dot="5"></button>
+            <button type="button" data-dot="6"></button>
+            <button type="button" data-dot="7"></button>
+            <button type="button" data-dot="8"></button>
+          </div>
+          <button class="ghost-button compact" type="button" id="clear-pattern">Limpiar patron</button>
+        </div>
+        <div class="dialog-actions">
+          <button class="primary-action" type="button" id="accept-pattern-dialog">Aceptar</button>
+          <button class="danger-button" type="button" id="cancel-pattern-dialog">Cancelar</button>
         </div>
       </form>
     </dialog>

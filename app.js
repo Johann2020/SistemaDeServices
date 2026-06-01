@@ -22,6 +22,7 @@ const state = {
   editingServiceId: null,
   equipmentDialogSource: "equipment",
   pattern: [],
+  patternBeforeDialog: [],
   serviceWorks: [],
   serviceParts: [],
   serviceIssues: [],
@@ -152,6 +153,12 @@ const els = {
   otherTypeWrap: document.querySelector("#other-type-wrap"),
   passwordWrap: document.querySelector("#password-wrap"),
   patternWrap: document.querySelector("#pattern-wrap"),
+  patternDialog: document.querySelector("#pattern-dialog"),
+  openPatternDialog: document.querySelector("#open-pattern-dialog"),
+  closePatternDialog: document.querySelector("#close-pattern-dialog"),
+  acceptPatternDialog: document.querySelector("#accept-pattern-dialog"),
+  cancelPatternDialog: document.querySelector("#cancel-pattern-dialog"),
+  patternSummary: document.querySelector("#pattern-summary"),
   patternGrid: document.querySelector("#pattern-grid"),
   patternLines: document.querySelector("#pattern-lines"),
   clearPattern: document.querySelector("#clear-pattern"),
@@ -558,6 +565,14 @@ function wireEvents() {
   els.patternGrid.addEventListener("pointerup", endPatternDraw);
   els.patternGrid.addEventListener("pointercancel", endPatternDraw);
   els.patternGrid.addEventListener("pointerleave", continuePatternDraw);
+  els.openPatternDialog?.addEventListener("click", openPatternDialog);
+  els.closePatternDialog?.addEventListener("click", cancelPatternDialog);
+  els.cancelPatternDialog?.addEventListener("click", cancelPatternDialog);
+  els.acceptPatternDialog?.addEventListener("click", acceptPatternDialog);
+  els.patternDialog?.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    cancelPatternDialog();
+  });
   els.clearPattern.addEventListener("click", () => {
     state.pattern = [];
     renderPattern();
@@ -3430,6 +3445,7 @@ function openEquipmentDialog(id = null, seed = {}) {
   updateModelSuggestions();
   if (!els.equipmentDialog.open) els.equipmentDialog.showModal();
   renderPattern();
+  renderPatternSummary();
   requestAnimationFrame(renderPattern);
   focusDialogShell(
     els.equipmentDialog,
@@ -3441,6 +3457,7 @@ function openEquipmentDialog(id = null, seed = {}) {
 }
 
 function closeEquipmentDialog() {
+  closePatternDialogIfOpen();
   hideEquipmentClientMenu();
   hideEquipmentTypeMenu();
   els.equipmentDialog.close();
@@ -3922,7 +3939,7 @@ function ensureIssueWorksForExecution() {
     state.serviceWorks.push({
       description,
       price: 0,
-      done: true,
+      done: false,
       note: "",
       technician: "",
       source: "issue",
@@ -4130,7 +4147,7 @@ function renderServiceWorks() {
     const typeIcon = isIssueWork ? "falla-field.svg" : "trabajo-field.svg";
     const typeIconAlt = isIssueWork ? "Falla" : "Trabajo";
     const stateText = work.done === false
-      ? (isIssueWork ? "No solucionado" : "No realizado")
+      ? (isIssueWork ? "No solucionada" : "No realizado")
       : (isIssueWork ? "Solucionado" : "Realizado");
     const technicianOptions = technicianSelectOptions(work.technician || "");
     const technicianCell = isIssueWork
@@ -4604,6 +4621,7 @@ function updateEquipmentVisibility() {
   els.otherTypeWrap.classList.toggle("hidden", type !== "Otro");
   els.passwordWrap.classList.toggle("hidden", !["Telefono", "Tablet", "Notebook", "CPU / PC"].includes(type));
   els.patternWrap.classList.toggle("hidden", !["Telefono", "Tablet"].includes(type));
+  renderPatternSummary();
 }
 
 function renderEquipmentTypePicker() {
@@ -4889,6 +4907,41 @@ function renderPattern() {
     line.setAttribute("y2", to.y);
     els.patternLines.appendChild(line);
   }
+  renderPatternSummary();
+}
+
+function renderPatternSummary() {
+  if (!els.patternSummary) return;
+  const hasPattern = state.pattern.length > 0;
+  els.patternSummary.textContent = hasPattern ? `Patron cargado: ${patternText(state.pattern.join("-"))}` : "Sin patron cargado";
+  if (els.openPatternDialog) {
+    els.openPatternDialog.textContent = hasPattern ? "Editar patron de desbloqueo" : "Establecer patron de desbloqueo";
+  }
+}
+
+function openPatternDialog() {
+  state.patternBeforeDialog = [...state.pattern];
+  renderPattern();
+  if (!els.patternDialog?.open) els.patternDialog?.showModal();
+}
+
+function acceptPatternDialog(event) {
+  event?.preventDefault();
+  state.patternBeforeDialog = [];
+  closePatternDialogIfOpen();
+  renderPatternSummary();
+}
+
+function cancelPatternDialog(event) {
+  event?.preventDefault();
+  state.pattern = [...(state.patternBeforeDialog || [])];
+  state.patternBeforeDialog = [];
+  renderPattern();
+  closePatternDialogIfOpen();
+}
+
+function closePatternDialogIfOpen() {
+  if (els.patternDialog?.open) els.patternDialog.close();
 }
 
 function getPatternDotAtPoint(clientX, clientY) {
