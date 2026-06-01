@@ -190,12 +190,20 @@ const els = {
   serviceSummaryBody: document.querySelector("#service-summary-body"),
   serviceIssuesBody: document.querySelector("#service-issues-body"),
   requestedWorksBody: document.querySelector("#requested-works-body"),
-  externalWorksBody: document.querySelector("#external-works-body"),
+  serviceIssuesGroup: document.querySelector("#service-issues-group"),
+  serviceIssueEntry: document.querySelector("#service-issue-entry"),
+  serviceIssueEntrySlot: document.querySelector("#service-issue-entry-slot"),
+  serviceExecutionIssueSlot: document.querySelector("#service-execution-issue-slot"),
+  requestedWorkEntry: document.querySelector("#requested-work-entry"),
+  requestedWorkEntrySlot: document.querySelector("#requested-work-entry-slot"),
+  serviceExecutionRequestedWorkSlot: document.querySelector("#service-execution-requested-work-slot"),
+  requestedWorkGroup: document.querySelector("#requested-work-group"),
+  serviceExecutionGroup: document.querySelector("#service-execution-group"),
   addWork: document.querySelector("#add-work"),
   addPart: document.querySelector("#add-part"),
   addIssue: document.querySelector("#add-issue"),
   addRequestedWork: document.querySelector("#add-requested-work"),
-  addExternalWork: document.querySelector("#add-external-work"),
+  addTechnician: document.querySelector("#add-technician"),
   quickNewClient: document.querySelector("#quick-new-client"),
   quickNewEquipment: document.querySelector("#quick-new-equipment"),
   quickEditClient: document.querySelector("#quick-edit-client"),
@@ -211,7 +219,6 @@ const els = {
     client: document.querySelector("#service-client"),
     equipment: document.querySelector("#service-equipment"),
     status: document.querySelector("#service-status"),
-    derived: document.querySelector("#service-derived"),
     failure: document.querySelector("#service-failure"),
     diagnosis: document.querySelector("#service-diagnosis"),
     accessories: document.querySelector("#service-accessories"),
@@ -219,11 +226,9 @@ const els = {
     requestedWorkDescription: document.querySelector("#requested-work-description"),
     workDescription: document.querySelector("#work-description"),
     workPrice: document.querySelector("#work-price"),
-    workNote: document.querySelector("#work-note"),
+    workTechnician: document.querySelector("#work-technician"),
     partProduct: document.querySelector("#part-product"),
     partQuantity: document.querySelector("#part-quantity"),
-    externalWork: document.querySelector("#external-work"),
-    externalCost: document.querySelector("#external-cost"),
   },
   serviceEquipmentTrigger: document.querySelector("#service-equipment-trigger"),
   serviceEquipmentMenu: document.querySelector("#service-equipment-menu"),
@@ -235,6 +240,7 @@ const els = {
     marginPercent: document.querySelector("#margin-percent"),
     frequentWorkDescription: document.querySelector("#frequent-work-description"),
     frequentWorkPrice: document.querySelector("#frequent-work-price"),
+    technicianName: document.querySelector("#technician-name"),
     reviewDelayAmount: document.querySelector("#service-review-delay-amount"),
     reviewDelayUnit: document.querySelector("#service-review-delay-unit"),
     pickupDelayAmount: document.querySelector("#service-pickup-delay-amount"),
@@ -251,6 +257,7 @@ const els = {
   orphanClientsText: document.querySelector("#orphan-clients-text"),
   marginsBody: document.querySelector("#margins-body"),
   frequentWorksBody: document.querySelector("#frequent-works-body"),
+  techniciansBody: document.querySelector("#technicians-body"),
   settingsTypeList: document.querySelector("#settings-type-list"),
   messageDialog: document.querySelector("#message-dialog"),
   messageBanner: document.querySelector("#message-banner"),
@@ -270,6 +277,7 @@ async function boot() {
   await initializeRemoteState();
   renderAll();
   decorateActionButtons();
+  setupRichTooltips();
   loadProvinces();
   window.addEventListener("resize", scheduleTableFit);
   window.setTimeout(checkServiceDelayAlerts, 400);
@@ -460,6 +468,7 @@ function wireEvents() {
   els.productFields.model.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshProductModelMenu(true), hideProductModelMenu));
   els.productFields.cost.addEventListener("input", refreshProductFinalPrice);
   els.productFields.margin.addEventListener("input", refreshProductFinalPrice);
+  [els.productFields.cost, els.productFields.margin, els.productFields.warrantyAmount].forEach(restrictInputToNumber);
   els.serviceForm.addEventListener("submit", saveService);
   els.closeServiceDialog.addEventListener("click", closeServiceDialog);
   els.cancelServiceDialog.addEventListener("click", closeServiceDialog);
@@ -472,20 +481,21 @@ function wireEvents() {
   els.serviceFields.client.addEventListener("keydown", handleServiceClientKeydown);
   bindEnterToButton([els.serviceFields.issueDescription], els.addIssue);
   bindEnterToButton([els.serviceFields.requestedWorkDescription], els.addRequestedWork);
-  bindEnterToButton([els.serviceFields.workDescription, els.serviceFields.workPrice, els.serviceFields.workNote], els.addWork);
+  bindEnterToButton([els.serviceFields.workDescription, els.serviceFields.workPrice, els.serviceFields.workTechnician], els.addWork);
   bindEnterToButton([els.serviceFields.partProduct, els.serviceFields.partQuantity], els.addPart);
-  bindEnterToButton([els.serviceFields.derived, els.serviceFields.externalWork, els.serviceFields.externalCost], els.addExternalWork);
   els.serviceFields.status.addEventListener("change", () => {
     configureServiceTabs(false);
     refreshServiceTotal();
   });
   els.serviceFields.workDescription.addEventListener("input", fillFrequentWorkPrice);
-  els.serviceFields.externalCost.addEventListener("input", refreshServiceTotal);
+  [
+    els.serviceFields.workPrice,
+    els.serviceFields.partQuantity,
+  ].forEach(restrictInputToNumber);
   els.addIssue.addEventListener("click", addServiceIssue);
   els.addRequestedWork.addEventListener("click", addRequestedServiceWork);
   els.addWork.addEventListener("click", addServiceWork);
   els.addPart.addEventListener("click", addServicePart);
-  els.addExternalWork.addEventListener("click", addExternalWork);
   els.serviceTabs.forEach((tab) => tab.addEventListener("click", () => showServiceTab(tab.dataset.serviceTab)));
   els.quickNewClient.addEventListener("click", () => openClientDialog());
   els.quickNewEquipment.addEventListener("click", openQuickEquipmentDialog);
@@ -499,6 +509,7 @@ function wireEvents() {
   els.runReplaceText?.addEventListener("click", runMassTextReplace);
   els.addMargin.addEventListener("click", addMargin);
   els.addFrequentWork.addEventListener("click", addFrequentWork);
+  els.addTechnician?.addEventListener("click", addTechnician);
   els.deleteOrphanClients?.addEventListener("click", deleteOrphanClients);
   els.messageClose.addEventListener("click", () => closeMessage(false));
   els.serviceActionMenu.addEventListener("click", handleActionMenuClick);
@@ -563,11 +574,20 @@ function wireEvents() {
 
 function bindEnterToButton(fields, button) {
   fields.forEach((field) => {
+    if (!field || !button) return;
     field.addEventListener("keydown", (event) => {
       if (event.key !== "Enter") return;
       event.preventDefault();
       button.click();
     });
+  });
+}
+
+function restrictInputToNumber(field) {
+  if (!field) return;
+  field.addEventListener("input", () => {
+    const nextValue = field.value.replace(/[^\d.,]/g, "");
+    if (nextValue !== field.value) field.value = nextValue;
   });
 }
 
@@ -781,6 +801,7 @@ function normalizeSettings(settings = {}) {
     transportCost: Number(settings.transportCost || 0),
     margins: Array.isArray(settings.margins) ? settings.margins : [],
     frequentWorks: Array.isArray(settings.frequentWorks) ? settings.frequentWorks : [],
+    technicians: Array.isArray(settings.technicians) ? settings.technicians : [],
     serviceFilters: settings.serviceFilters || { all: true, statuses: [] },
     serviceDelays: normalizeServiceDelays(settings.serviceDelays),
     serviceDelayReminders: normalizeServiceDelayReminders(settings.serviceDelayReminders),
@@ -880,6 +901,7 @@ function loadSettings() {
     transportCost: 0,
     margins: [],
     frequentWorks: [],
+    technicians: [],
     serviceFilters: {
       all: true,
       statuses: [],
@@ -1423,6 +1445,112 @@ function decorateActionButtons(root = document) {
   });
 }
 
+function setupRichTooltips() {
+  if (document.querySelector(".app-tooltip")) return;
+  const tooltip = document.createElement("div");
+  tooltip.className = "app-tooltip";
+  tooltip.setAttribute("role", "tooltip");
+  document.body.appendChild(tooltip);
+
+  let activeTarget = null;
+
+  document.addEventListener("pointerover", (event) => {
+    const target = getTooltipTarget(event);
+    if (!target || target === activeTarget) return;
+    activeTarget = target;
+    showRichTooltip(tooltip, target);
+  });
+
+  document.addEventListener("pointermove", (event) => {
+    if (!activeTarget) return;
+    const target = getTooltipTarget(event);
+    if (target !== activeTarget) {
+      hideRichTooltip(tooltip);
+      activeTarget = null;
+      return;
+    }
+    positionRichTooltip(tooltip, activeTarget);
+  });
+
+  document.addEventListener("pointerout", (event) => {
+    if (!activeTarget) return;
+    const related = event.relatedTarget;
+    if (related && activeTarget.contains(related)) return;
+    hideRichTooltip(tooltip);
+    activeTarget = null;
+  });
+}
+
+function getTooltipTarget(event) {
+  const target = event.target.closest?.("[data-tooltip]");
+  if (!target || !target.dataset.tooltip) return null;
+  if (target.classList.contains("linked-cell")) {
+    const interactiveText = event.target.closest("strong, .device-label");
+    return interactiveText && target.contains(interactiveText) ? target : null;
+  }
+  return target;
+}
+
+function showRichTooltip(tooltip, target) {
+  const lines = String(target.dataset.tooltip || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (!lines.length) return;
+  const footer = target.classList.contains("linked-cell")
+    ? `<div class="app-tooltip-footer"><span>i</span> Click para editar</div>`
+    : "";
+  tooltip.innerHTML = `
+    <div class="app-tooltip-title">Informacion</div>
+    <div class="app-tooltip-body">
+      ${lines.map((line) => tooltipLineHtml(line)).join("")}
+    </div>
+    ${footer}
+  `;
+  tooltip.classList.add("visible");
+  positionRichTooltip(tooltip, target);
+}
+
+function tooltipLineHtml(line) {
+  const separator = line.indexOf(":");
+  if (separator > 0 && separator < 28) {
+    const label = line.slice(0, separator + 1);
+    const value = line.slice(separator + 1).trim() || "-";
+    return `
+      <div class="app-tooltip-row">
+        <strong>${escapeHtml(label)}</strong>
+        <span>${escapeHtml(value)}</span>
+      </div>
+    `;
+  }
+  return `<div class="app-tooltip-row app-tooltip-line">${escapeHtml(line)}</div>`;
+}
+
+function positionRichTooltip(tooltip, target) {
+  const rect = target.getBoundingClientRect();
+  const margin = 8;
+  const tooltipRect = tooltip.getBoundingClientRect();
+  let left = rect.left + 10;
+  let top = rect.bottom + margin;
+
+  if (left + tooltipRect.width > window.innerWidth - margin) {
+    left = Math.max(margin, window.innerWidth - tooltipRect.width - margin);
+  }
+  if (top + tooltipRect.height > window.innerHeight - margin) {
+    top = Math.max(margin, rect.top - tooltipRect.height - margin);
+    tooltip.classList.add("above");
+  } else {
+    tooltip.classList.remove("above");
+  }
+
+  tooltip.style.left = `${Math.max(margin, left)}px`;
+  tooltip.style.top = `${top}px`;
+}
+
+function hideRichTooltip(tooltip) {
+  tooltip.classList.remove("visible", "above");
+}
+
 function renderMetrics() {
   const dashboard = state.dashboard;
   els.metricClients.textContent = String(dashboard?.counts?.clients ?? state.clients.length);
@@ -1587,7 +1715,6 @@ function renderServices() {
     const equipment = equipmentById.get(Number(service.equipmentId)) || service._equipment;
     const partsSummary = servicePartsSummary(service);
     const worksSummary = serviceWorksSummary(service);
-    const derivationSummary = serviceDerivationSummary(service);
     const text = normalizeSearch(
       [
         service.id,
@@ -1597,7 +1724,6 @@ function renderServices() {
         service.failure,
         worksSummary,
         partsSummary,
-        derivationSummary,
         service.diagnosis,
         service.accessories,
       ].join(" ")
@@ -1616,18 +1742,18 @@ function renderServices() {
     const worksTooltip = serviceWorksTooltip(service);
     const partsSummary = servicePartsSummary(service);
     const partsTooltip = servicePartsTooltip(service);
-    const derivationSummary = serviceDerivationSummary(service);
-    const derivationTooltip = serviceDerivationTooltip(service);
+    const accessoriesSummary = serviceAccessoriesSummary(service);
+    const accessoriesTooltip = serviceAccessoriesTooltip(service);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(service.id)}</td>
       <td><span class="status-pill ${statusClass(service.status)}">${escapeHtml(displayServiceStatusLabel(service.status))}</span></td>
       <td class="linked-cell" data-open-client="${escapeHtml(client?.id || "")}" data-tooltip="${escapeHtml(clientTooltip(client))}"><strong>${escapeHtml(client?.name || "Sin cliente")}</strong></td>
       <td class="linked-cell" data-open-equipment="${escapeHtml(equipment?.id || "")}" data-tooltip="${escapeHtml(equipmentTooltip(equipment))}">${deviceLabelHtml(equipment)}</td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(accessoriesTooltip)}"><span class="cell-ellipsis">${escapeHtml(accessoriesSummary || "---")}</span></td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(failureTooltip)}"><span class="cell-ellipsis">${escapeHtml(failure || "---")}</span></td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(worksTooltip)}"><span class="cell-ellipsis">${escapeHtml(worksSummary || "---")}</span></td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(partsTooltip)}"><span class="cell-ellipsis">${escapeHtml(partsSummary || "---")}</span></td>
-      <td class="tooltip-cell" data-tooltip="${escapeHtml(derivationTooltip)}"><span class="cell-ellipsis">${escapeHtml(derivationSummary || "---")}</span></td>
       <td>${dateWithAgeHtml(service.entryDate)}</td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(serviceFinalizedTooltip(service))}">${dateWithAgeHtml(service.finishDate)}</td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(serviceDeliveredTooltip(service))}">${dateWithAgeHtml(service.deliveryDate)}</td>
@@ -1680,18 +1806,9 @@ function renderServiceFilterControls() {
     const count = Number(counts[status] || 0);
     const label = element.closest("label");
     const input = label?.querySelector("input");
-    if (label) label.classList.toggle("hidden", count === 0);
-    if (count === 0 && input?.checked) input.checked = false;
+    if (label) label.classList.toggle("hidden", count === 0 && !input?.checked);
     element.textContent = `(${count})`;
   });
-
-  const visibleChecked = els.serviceFilters.filter((filter) =>
-    filter.checked && !filter.closest("label")?.classList.contains("hidden")
-  );
-  if (!els.filterAll.checked && visibleChecked.length === 0) {
-    state.settings.serviceFilters = { all: true, statuses: [] };
-    els.filterAll.checked = true;
-  }
 }
 
 function renderServiceHistoryFilter() {
@@ -1816,7 +1933,8 @@ async function handleActionMenuClick(event) {
     openServiceDialog(record.id);
     els.serviceFields.status.value = "Revisado";
     configureServiceTabs(false);
-    showServiceTab("service-work-tab");
+    renderServiceWorks();
+    showServiceTab("service-diagnosis-tab");
   } else if (action === "deliver-service") {
     closeActionMenu();
     await changeServiceStatus(record.id, "Entregado", record.item);
@@ -1846,7 +1964,6 @@ async function changeServiceStatus(id, newStatus, seed = null) {
     });
   }
   state.selectedRow = { type: "services", id };
-  keepSavedServiceVisible(id);
   renderAll();
   if (state.remoteEnabled) {
     showToast(`Servicio marcado como ${displayServiceStatusLabel(newStatus)}`);
@@ -2091,6 +2208,17 @@ function renderSettings() {
     `;
     els.frequentWorksBody.appendChild(tr);
   });
+  if (els.techniciansBody) {
+    els.techniciansBody.innerHTML = "";
+    state.settings.technicians.forEach((technician, index) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${escapeHtml(technician)}</td>
+        <td><button class="small-button delete" type="button" data-remove-technician="${index}">Quitar</button></td>
+      `;
+      els.techniciansBody.appendChild(tr);
+    });
+  }
 
   els.marginsBody.querySelectorAll("[data-remove-margin]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -2109,8 +2237,20 @@ function renderSettings() {
       showToast("Trabajo frecuente quitado");
     });
   });
+  els.techniciansBody?.querySelectorAll("[data-remove-technician]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.settings.technicians.splice(Number(button.dataset.removeTechnician), 1);
+      persistSettings();
+      renderAll();
+      refreshTechnicianOptions();
+      showToast("Tecnico quitado");
+    });
+  });
 
   refreshSettingsTypeDatalist();
+  refreshTechnicianOptions();
+  decorateActionButtons(els.techniciansBody);
+  if (els.techniciansBody) toggleTableVisibility(els.techniciansBody);
 }
 
 function getOrphanClients() {
@@ -2207,6 +2347,18 @@ function addFrequentWork() {
   persistSettings();
   renderAll();
   showToast(current ? "Trabajo frecuente actualizado" : "Trabajo frecuente agregado");
+}
+
+function addTechnician() {
+  const name = els.settingsFields.technicianName?.value.trim();
+  if (!name) return;
+  const current = state.settings.technicians.find((item) => normalizeSearch(item) === normalizeSearch(name));
+  if (!current) state.settings.technicians.push(name);
+  if (els.settingsFields.technicianName) els.settingsFields.technicianName.value = "";
+  persistSettings();
+  renderAll();
+  refreshTechnicianOptions();
+  showToast(current ? "Tecnico ya cargado" : "Tecnico agregado");
 }
 
 async function runMassTextReplace() {
@@ -3265,19 +3417,14 @@ function openServiceDialog(id = null) {
     els.serviceFields.equipment.value = String(service.equipmentId);
     syncServiceEquipmentPicker();
     els.serviceFields.status.value = service.status;
-    els.serviceFields.derived.value = service.derived;
     els.serviceFields.diagnosis.value = service.diagnosis;
     els.serviceFields.accessories.value = service.accessories;
-    els.serviceFields.externalWork.value = service.externalWork;
-    els.serviceFields.externalCost.value = service.externalCost ? String(service.externalCost) : "";
     state.serviceIssues = service.issues ? structuredClone(service.issues) : legacyIssuesFromFailure(service.failure);
     state.serviceWorks = service.works ? normalizeServiceWorks(service.works) : [];
     state.serviceParts = service.parts ? structuredClone(service.parts) : [];
     state.externalWorks = service.externalWorks ? structuredClone(service.externalWorks) : legacyExternalWorks(service);
   } else {
     els.serviceFields.status.value = "Sin revisar";
-    const lastClient = state.clients[state.clients.length - 1];
-    if (lastClient) els.serviceFields.client.value = clientToOption(lastClient);
     refreshServiceEquipmentSelect();
   }
 
@@ -3285,9 +3432,9 @@ function openServiceDialog(id = null) {
   showServiceTab("service-client-tab");
   renderServiceIssues();
   renderRequestedWorks();
+  refreshTechnicianOptions();
   renderServiceWorks();
   renderServiceParts();
-  renderExternalWorks();
   refreshPartProductDatalist();
   refreshServiceTotal();
   if (!els.serviceDialog.open) els.serviceDialog.showModal();
@@ -3417,7 +3564,6 @@ function keepSavedServiceVisible(id) {
 }
 
 function getServiceFormData() {
-  const externalCost = state.externalWorks.reduce((sum, work) => sum + work.price, 0);
   const worksTotal = state.serviceWorks.reduce((sum, work) => sum + work.price, 0);
   const partsTotal = state.serviceParts.reduce((sum, part) => sum + part.quantity * part.salePrice, 0);
   const failureText = state.serviceIssues.map((issue) => issue.comment ? `${issue.description} (${issue.comment})` : issue.description).join(" | ");
@@ -3429,14 +3575,14 @@ function getServiceFormData() {
     failure: failureText,
     diagnosis: els.serviceFields.diagnosis.value.trim(),
     accessories: els.serviceFields.accessories.value.trim(),
-    derived: els.serviceFields.derived.value.trim(),
-    externalWork: state.externalWorks.map((work) => `${work.technician}: ${work.description}`).join(" | "),
-    externalCost,
+    derived: serviceTechniciansSummary({ works: state.serviceWorks }),
+    externalWork: "",
+    externalCost: 0,
     works: structuredClone(state.serviceWorks),
     issues: structuredClone(state.serviceIssues),
-    externalWorks: structuredClone(state.externalWorks),
+    externalWorks: [],
     parts: structuredClone(state.serviceParts),
-    total: worksTotal + partsTotal + externalCost,
+    total: worksTotal + partsTotal,
   };
 }
 
@@ -3467,21 +3613,74 @@ function showServiceTab(tabId) {
 
 function configureServiceTabs(isNew) {
   const status = els.serviceFields.status.value || "Sin revisar";
-  const statusVisible = !isNew;
   const allowExecutionTabs = !["Sin revisar", "Revision demorada"].includes(status) && !isNew;
   els.serviceTabs.forEach((tab) => {
     const tabId = tab.dataset.serviceTab;
-    const shouldHide = tabId === "service-status-tab"
-      ? !statusVisible
-      : ["service-work-tab", "service-parts-tab", "service-derived-tab", "service-summary-tab"].includes(tabId)
-        ? !allowExecutionTabs
-        : false;
+    const shouldHide = ["service-parts-tab", "service-summary-tab"].includes(tabId)
+      ? !allowExecutionTabs
+      : false;
     tab.classList.toggle("hidden", shouldHide);
   });
+  updateServiceWorkMode(isNew);
 
   const activeHidden = els.serviceTabs.some((tab) => tab.classList.contains("active") && tab.classList.contains("hidden"));
   if (isNew) showServiceTab("service-client-tab");
   else if (activeHidden) showServiceTab("service-diagnosis-tab");
+}
+
+function updateServiceWorkMode(isNew = !state.editingServiceId) {
+  const status = els.serviceFields.status.value || "Sin revisar";
+  const executionMode = !isNew && !["Sin revisar", "Revision demorada"].includes(status);
+  const issueEntryTarget = executionMode ? els.serviceExecutionIssueSlot : els.serviceIssueEntrySlot;
+  const requestedWorkEntryTarget = executionMode ? els.serviceExecutionRequestedWorkSlot : els.requestedWorkEntrySlot;
+  if (els.serviceIssueEntry && issueEntryTarget && els.serviceIssueEntry.parentElement !== issueEntryTarget) {
+    issueEntryTarget.appendChild(els.serviceIssueEntry);
+  }
+  if (els.requestedWorkEntry && requestedWorkEntryTarget && els.requestedWorkEntry.parentElement !== requestedWorkEntryTarget) {
+    requestedWorkEntryTarget.appendChild(els.requestedWorkEntry);
+  }
+  els.serviceIssuesGroup?.classList.toggle("hidden", executionMode);
+  els.requestedWorkGroup?.classList.toggle("hidden", executionMode);
+  els.serviceExecutionGroup?.classList.toggle("hidden", !executionMode);
+  const diagnosisTab = els.serviceTabs.find((tab) => tab.dataset.serviceTab === "service-diagnosis-tab");
+  if (diagnosisTab) {
+    diagnosisTab.textContent = executionMode
+      ? "Solucion o Trabajos realizados"
+      : "Falla o trabajo a realizar";
+  }
+}
+
+function isServiceExecutionMode(isNew = !state.editingServiceId) {
+  const status = els.serviceFields.status.value || "Sin revisar";
+  return !isNew && !["Sin revisar", "Revision demorada"].includes(status);
+}
+
+function ensureIssueWorksForExecution() {
+  if (!isServiceExecutionMode()) return false;
+  let changed = false;
+  const existing = new Set(
+    state.serviceWorks
+      .map((work) => normalizeSearch(work.description))
+      .filter(Boolean)
+  );
+
+  state.serviceIssues.forEach((issue) => {
+    const description = String(issue.description || "").trim();
+    const key = normalizeSearch(description);
+    if (!description || existing.has(key)) return;
+    state.serviceWorks.push({
+      description,
+      price: 0,
+      done: true,
+      note: "",
+      technician: "",
+      source: "issue",
+    });
+    existing.add(key);
+    changed = true;
+  });
+
+  return changed;
 }
 
 function addServiceIssue() {
@@ -3496,6 +3695,7 @@ function addServiceIssue() {
   els.serviceFields.issueDescription.value = "";
   els.serviceError.textContent = "";
   renderServiceIssues();
+  renderServiceWorks();
 }
 
 function renderServiceIssues() {
@@ -3511,8 +3711,15 @@ function renderServiceIssues() {
 
   els.serviceIssuesBody.querySelectorAll("[data-remove-issue]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.serviceIssues.splice(Number(button.dataset.removeIssue), 1);
+      const [removed] = state.serviceIssues.splice(Number(button.dataset.removeIssue), 1);
+      const removedKey = normalizeSearch(removed?.description || "");
+      if (removedKey) {
+        state.serviceWorks = state.serviceWorks.filter((work) =>
+          work.source !== "issue" || normalizeSearch(work.description) !== removedKey
+        );
+      }
       renderServiceIssues();
+      renderServiceWorks();
     });
   });
   decorateActionButtons(els.serviceIssuesBody);
@@ -3531,7 +3738,7 @@ function addRequestedServiceWork() {
     normalizeSearch(work.description) === normalizeSearch(description) && work.source === "requested"
   );
   if (!exists) {
-    state.serviceWorks.push({ description, price: 0, done: false, note: "", source: "requested" });
+    state.serviceWorks.push({ description, price: 0, done: false, note: "", technician: "", source: "requested" });
   }
   els.serviceFields.requestedWorkDescription.value = "";
   els.serviceError.textContent = "";
@@ -3567,18 +3774,19 @@ function renderRequestedWorks() {
   });
   decorateActionButtons(els.requestedWorksBody);
   toggleTableVisibility(els.requestedWorksBody);
+  updateServiceWorkMode();
 }
 
 function addServiceWork() {
   const description = els.serviceFields.workDescription.value.trim();
   const price = parseMoney(els.serviceFields.workPrice.value);
-  const note = els.serviceFields.workNote.value.trim();
+  const technician = els.serviceFields.workTechnician.value.trim();
   if (!description || !price) {
     els.serviceError.textContent = "Escriba un trabajo y su precio.";
     return;
   }
 
-  state.serviceWorks.push({ description, price, done: true, note, source: "extra" });
+  state.serviceWorks.push({ description, price, done: true, note: "", technician, source: "extra" });
   const existingFrequent = state.settings.frequentWorks.find((work) => work.description === description);
   if (!existingFrequent) {
     state.settings.frequentWorks.push({ description, price });
@@ -3587,7 +3795,7 @@ function addServiceWork() {
   }
   els.serviceFields.workDescription.value = "";
   els.serviceFields.workPrice.value = "";
-  els.serviceFields.workNote.value = "";
+  els.serviceFields.workTechnician.value = "";
   els.serviceError.textContent = "";
   renderServiceWorks();
   refreshServiceTotal();
@@ -3651,36 +3859,48 @@ async function addServicePart() {
   refreshServiceTotal();
 }
 
-function addExternalWork() {
-  const technician = els.serviceFields.derived.value.trim();
-  const description = els.serviceFields.externalWork.value.trim();
-  const price = parseMoney(els.serviceFields.externalCost.value);
-
-  if (!technician || !description || !price) {
-    els.serviceError.textContent = "Complete tecnico, trabajo derivado y precio.";
-    return;
-  }
-
-  state.externalWorks.push({ technician, description, price });
-  els.serviceFields.externalWork.value = "";
-  els.serviceFields.externalCost.value = "";
-  els.serviceError.textContent = "";
-  renderExternalWorks();
-  refreshServiceTotal();
-}
-
 function renderServiceWorks() {
+  ensureIssueWorksForExecution();
   els.serviceWorksBody.innerHTML = "";
-  state.serviceWorks.forEach((work, index) => {
-    const source = work.source === "requested" ? "Pedido por cliente" : "Extra";
+  const sourceOrder = { issue: 1, requested: 2, extra: 3 };
+  state.serviceWorks
+    .map((work, index) => ({ work, index }))
+    .sort((a, b) => {
+      const sourceDiff = (sourceOrder[a.work.source] || 9) - (sourceOrder[b.work.source] || 9);
+      return sourceDiff || a.index - b.index;
+    })
+    .forEach(({ work, index }) => {
+    const source = work.source === "requested"
+      ? "Trabajo pedido por el cliente"
+      : work.source === "issue"
+        ? "Falla reportada"
+        : "Trabajo extra";
+    const isIssueWork = work.source === "issue";
+    const typeIcon = isIssueWork ? "falla-field.svg" : "trabajo-field.svg";
+    const typeIconAlt = isIssueWork ? "Falla" : "Trabajo";
+    const stateText = work.done === false
+      ? (isIssueWork ? "No solucionado" : "No realizado")
+      : (isIssueWork ? "Solucionado" : "Realizado");
+    const technicianOptions = technicianSelectOptions(work.technician || "");
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>
-        <strong>${escapeHtml(work.description)}</strong>
-        <span class="muted-line">${source}</span>
+        <span class="work-kind-cell">
+          <span class="embedded-combo-icon work-kind-icon"><img src="assets/icons/${typeIcon}" alt="${typeIconAlt}"></span>
+          <span>
+            <strong>${escapeHtml(work.description)}</strong>
+            <span class="muted-line">${source}</span>
+          </span>
+        </span>
       </td>
-      <td><input type="checkbox" data-work-done="${index}" ${work.done === false ? "" : "checked"}></td>
-      <td><textarea class="work-note-input" data-work-note="${index}" rows="2" placeholder="${work.done === false ? "Motivo" : "Comentario"}">${escapeHtml(work.note || "")}</textarea></td>
+      <td>
+        <label class="work-state-toggle ${work.done === false ? "pending" : "done"}">
+          <input type="checkbox" data-work-done="${index}" ${work.done === false ? "" : "checked"}>
+          <span>${stateText}</span>
+        </label>
+      </td>
+      <td><textarea data-work-note="${index}" placeholder="${work.done === false ? "Motivo" : "Comentario"}">${escapeHtml(work.note || "")}</textarea></td>
+      <td><select data-work-technician="${index}">${technicianOptions}</select></td>
       <td><input class="price-input" type="text" inputmode="numeric" data-work-price="${index}" value="${escapeHtml(String(work.price || ""))}" placeholder="$ 0" ${work.done === false ? "disabled" : ""}></td>
       <td><button class="small-button delete" type="button" data-remove-work="${index}">Quitar</button></td>
     `;
@@ -3700,9 +3920,15 @@ function renderServiceWorks() {
       refreshServiceTotal();
     });
   });
-  els.serviceWorksBody.querySelectorAll("[data-work-note]").forEach((input) => {
-    input.addEventListener("input", () => {
-      state.serviceWorks[Number(input.dataset.workNote)].note = input.value;
+  els.serviceWorksBody.querySelectorAll("[data-work-technician]").forEach((select) => {
+    select.addEventListener("change", () => {
+      state.serviceWorks[Number(select.dataset.workTechnician)].technician = select.value;
+      refreshServiceSummary();
+    });
+  });
+  els.serviceWorksBody.querySelectorAll("[data-work-note]").forEach((textarea) => {
+    textarea.addEventListener("input", () => {
+      state.serviceWorks[Number(textarea.dataset.workNote)].note = textarea.value;
       refreshServiceSummary();
     });
   });
@@ -3724,15 +3950,39 @@ function renderServiceWorks() {
 
   els.serviceWorksBody.querySelectorAll("[data-remove-work]").forEach((button) => {
     button.addEventListener("click", () => {
-      state.serviceWorks.splice(Number(button.dataset.removeWork), 1);
+      const [removed] = state.serviceWorks.splice(Number(button.dataset.removeWork), 1);
+      const removedKey = normalizeSearch(removed?.description || "");
+      if (removed?.source === "issue" && removedKey) {
+        state.serviceIssues = state.serviceIssues.filter((issue) =>
+          normalizeSearch(issue.description || "") !== removedKey
+        );
+      }
       renderRequestedWorks();
+      renderServiceIssues();
       renderServiceWorks();
       refreshServiceTotal();
     });
   });
   decorateActionButtons(els.serviceWorksBody);
   toggleTableVisibility(els.serviceWorksBody);
+  updateServiceWorkMode();
   refreshServiceSummary();
+}
+
+function technicianSelectOptions(selected = "") {
+  const options = [`<option value="">Sin asignar</option>`];
+  const technicians = [...state.settings.technicians];
+  if (selected && !technicians.includes(selected)) technicians.push(selected);
+  technicians.forEach((technician) => {
+    options.push(`<option value="${escapeHtml(technician)}" ${technician === selected ? "selected" : ""}>${escapeHtml(technician)}</option>`);
+  });
+  return options.join("");
+}
+
+function refreshTechnicianOptions() {
+  if (!els.serviceFields?.workTechnician) return;
+  const current = els.serviceFields.workTechnician.value;
+  els.serviceFields.workTechnician.innerHTML = technicianSelectOptions(current);
 }
 
 function renderServiceParts() {
@@ -3782,15 +4032,17 @@ function renderServiceParts() {
 function refreshServiceTotal() {
   const worksTotal = state.serviceWorks.reduce((sum, work) => sum + work.price, 0);
   const partsTotal = state.serviceParts.reduce((sum, part) => sum + part.quantity * part.salePrice, 0);
-  const externalTotal = state.externalWorks.reduce((sum, work) => sum + work.price, 0);
-  els.serviceTotal.textContent = money(worksTotal + partsTotal + externalTotal);
+  els.serviceTotal.textContent = money(worksTotal + partsTotal);
 }
 
 function refreshServiceSummary() {
   if (!els.serviceSummaryBody) return;
   els.serviceSummaryBody.innerHTML = "";
   state.serviceWorks.forEach((work) => {
-    const detail = work.source === "requested" ? `${work.description} (pedido por cliente)` : work.description;
+    const source = work.source === "requested" ? "pedido por cliente" : "extra";
+    const technician = work.technician ? ` - ${work.technician}` : "";
+    const note = work.note ? ` - ${work.note}` : "";
+    const detail = `${work.description} (${source})${technician}${note}`;
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>Trabajo</td>
@@ -3812,42 +4064,7 @@ function refreshServiceSummary() {
     els.serviceSummaryBody.appendChild(tr);
   });
 
-  state.externalWorks.forEach((work) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>Tercero</td>
-      <td>${escapeHtml(`${work.technician} - ${work.description}`)}</td>
-      <td>---</td>
-      <td>${money(work.price)}</td>
-    `;
-    els.serviceSummaryBody.appendChild(tr);
-  });
   toggleTableVisibility(els.serviceSummaryBody);
-}
-
-function renderExternalWorks() {
-  els.externalWorksBody.innerHTML = "";
-  state.externalWorks.forEach((work, index) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(work.technician)}</td>
-      <td>${escapeHtml(work.description)}</td>
-      <td>${money(work.price)}</td>
-      <td><button class="small-button delete" type="button" data-remove-external-work="${index}">Quitar</button></td>
-    `;
-    els.externalWorksBody.appendChild(tr);
-  });
-
-  els.externalWorksBody.querySelectorAll("[data-remove-external-work]").forEach((button) => {
-    button.addEventListener("click", () => {
-      state.externalWorks.splice(Number(button.dataset.removeExternalWork), 1);
-      renderExternalWorks();
-      refreshServiceTotal();
-    });
-  });
-  decorateActionButtons(els.externalWorksBody);
-  toggleTableVisibility(els.externalWorksBody);
-  refreshServiceSummary();
 }
 
 function refreshServiceClientDatalist() {
@@ -3925,14 +4142,14 @@ function refreshServiceEquipmentSelect() {
   const equipment = state.equipment.filter((item) => item.clientId === clientId);
   const hasEquipment = equipment.length > 0;
   els.serviceFields.equipment.innerHTML = hasEquipment
-    ? equipment
+    ? `<option value="">Seleccione un equipo</option>` + equipment
         .map((item) => `<option value="${item.id}">${escapeHtml(equipmentLabel(item))}</option>`)
         .join("")
-    : `<option value="">Sin equipos cargados</option>`;
+    : `<option value="">${escapeHtml(serviceEquipmentPlaceholder(clientId, hasEquipment))}</option>`;
   els.serviceFields.equipment.disabled = !hasEquipment;
-  els.quickEditEquipment.disabled = !hasEquipment;
+  els.quickEditEquipment.disabled = true;
   renderServiceEquipmentPicker(equipment);
-  els.serviceNoEquipment.classList.toggle("hidden", hasEquipment || !clientId);
+  els.serviceNoEquipment.classList.add("hidden");
 }
 
 function renderServiceEquipmentPicker(equipment) {
@@ -3963,10 +4180,29 @@ function renderServiceEquipmentPicker(equipment) {
 
 function syncServiceEquipmentPicker() {
   const equipment = getEquipmentById(els.serviceFields.equipment.value);
-  els.serviceEquipmentTrigger.innerHTML = equipment ? deviceLabelHtml(equipment) : "Sin equipos cargados";
+  const clientId = optionToClientId(els.serviceFields.client.value);
+  const hasEquipment = clientId ? state.equipment.some((item) => item.clientId === clientId) : false;
+  els.serviceEquipmentTrigger.innerHTML = equipment
+    ? deviceLabelHtml(equipment)
+    : placeholderDeviceLabel(serviceEquipmentPlaceholder(clientId, hasEquipment));
+  els.quickEditEquipment.disabled = !equipment;
   els.serviceEquipmentMenu.querySelectorAll("[data-service-equipment]").forEach((button) => {
     button.classList.toggle("selected", button.dataset.serviceEquipment === String(els.serviceFields.equipment.value));
   });
+}
+
+function serviceEquipmentPlaceholder(clientId, hasEquipment) {
+  if (!clientId) return "Seleccione primero un cliente para continuar";
+  return hasEquipment ? "Seleccione un equipo" : "Cliente sin equipos, cargue uno primero";
+}
+
+function placeholderDeviceLabel(text) {
+  return `
+    <span class="device-label equipment-placeholder">
+      <span class="device-icon"><img src="assets/icons/device-generic.svg" alt=""></span>
+      <span>${escapeHtml(text)}</span>
+    </span>
+  `;
 }
 
 function toggleServiceEquipmentMenu(event) {
@@ -4004,6 +4240,10 @@ function refreshFrequentWorkDatalist() {
 
 function toggleTableVisibility(tbody) {
   const table = tbody.closest("table");
+  if (table?.classList.contains("keep-empty")) {
+    table.classList.remove("hidden");
+    return;
+  }
   if (table) table.classList.toggle("hidden", tbody.children.length === 0);
 }
 
@@ -4070,6 +4310,7 @@ function normalizeServiceWorks(works) {
     price: Number(work.price || 0),
     done: work.done !== false,
     note: work.note || "",
+    technician: work.technician || "",
     source: work.source || "extra",
   }));
 }
@@ -4592,15 +4833,40 @@ function serviceWorksItems(service) {
     .filter((work) => work.description)
     .map((work) => {
       const done = work.done === false ? "No realizado" : "Realizado";
-      const noteLabel = work.done === false ? "Motivo" : "Comentario";
-      const note = work.note ? ` - ${noteLabel}: ${work.note}` : "";
+      const technician = work.technician ? ` - Tecnico: ${work.technician}` : "";
+      const note = work.note ? ` - ${work.note}` : "";
       const price = Number(work.price || 0);
       const priceText = price ? ` - ${money(price)}` : "";
       return {
         label: work.description,
-        detail: `${done}: ${work.description}${note}${priceText}`,
+        detail: `${done}: ${work.description}${technician}${note}${priceText}`,
       };
     });
+}
+
+function serviceTechnicians(service) {
+  const names = new Set();
+  (service.works || []).forEach((work) => {
+    if (work.technician) names.add(work.technician);
+  });
+  (service.externalWorks || legacyExternalWorks(service)).forEach((work) => {
+    if (work.technician) names.add(work.technician);
+  });
+  return [...names];
+}
+
+function serviceTechniciansSummary(service) {
+  return serviceTechnicians(service).join(" | ");
+}
+
+function serviceTechniciansTooltip(service) {
+  const workLines = (service.works || [])
+    .filter((work) => work.technician)
+    .map((work) => `${work.technician}: ${work.description}`);
+  const legacyLines = (service.externalWorks || legacyExternalWorks(service))
+    .filter((work) => work.technician)
+    .map((work) => `${work.technician}: ${work.description || "Trabajo externo"}`);
+  return [...workLines, ...legacyLines].join("\n");
 }
 
 function serviceWorksSummary(service) {
@@ -4613,6 +4879,21 @@ function serviceWorksTooltip(service) {
   return serviceWorksItems(service)
     .map((item) => item.detail)
     .join("\n");
+}
+
+function serviceAccessoriesItems(service) {
+  return String(service?.accessories || "")
+    .split(/\s*[|,;]\s*/g)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function serviceAccessoriesSummary(service) {
+  return serviceAccessoriesItems(service).join(" | ");
+}
+
+function serviceAccessoriesTooltip(service) {
+  return serviceAccessoriesItems(service).join("\n");
 }
 
 function servicePartsSummary(service) {

@@ -263,10 +263,10 @@
                   <th>Estado</th>
                   <th>Cliente</th>
                   <th>Equipo</th>
+                  <th>Accesorios</th>
                   <th>Falla / Trabajo</th>
                   <th>Trabajos realizados</th>
                   <th>Repuestos</th>
-                  <th>Derivacion</th>
                   <th>Ingreso</th>
                   <th>Finalizado</th>
                   <th>Entregado</th>
@@ -392,6 +392,27 @@
                     </tr>
                   </thead>
                   <tbody id="frequent-works-body"></tbody>
+                </table>
+              </section>
+              <section class="panel">
+                <div class="panel-heading">
+                  <h2>Tecnicos</h2>
+                </div>
+                <div class="work-entry technician-entry">
+                  <label>
+                    Nombre
+                    <input id="technician-name" autocomplete="off">
+                  </label>
+                  <button class="ghost-button" type="button" id="add-technician">Agregar</button>
+                </div>
+                <table class="mini-table">
+                  <thead>
+                    <tr>
+                      <th>Tecnico</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="technicians-body"></tbody>
                 </table>
               </section>
             </section>
@@ -595,69 +616,92 @@
 
         <div class="service-tabs" role="tablist" aria-label="Secciones del servicio">
           <button class="service-tab active" type="button" data-service-tab="service-client-tab">Cliente y Equipo</button>
-          <button class="service-tab" type="button" data-service-tab="service-diagnosis-tab">Falla o trabajo</button>
-          <button class="service-tab" type="button" data-service-tab="service-status-tab">Estado</button>
-          <button class="service-tab" type="button" data-service-tab="service-work-tab">Trabajos</button>
+          <button class="service-tab" type="button" data-service-tab="service-diagnosis-tab">Problema y/o trabajo a realizar</button>
           <button class="service-tab" type="button" data-service-tab="service-parts-tab">Repuestos</button>
-          <button class="service-tab" type="button" data-service-tab="service-derived-tab">Derivacion</button>
           <button class="service-tab" type="button" data-service-tab="service-summary-tab">Resumen</button>
         </div>
+        <select class="hidden-select" id="service-status" name="status" tabindex="-1" aria-hidden="true">
+          <option value="Sin revisar">Sin ver</option>
+          <option value="Revisado">Finalizado</option>
+          <option>Revision demorada</option>
+          <option>Retiro demorado</option>
+          <option>Entregado</option>
+          <option>Cancelado</option>
+        </select>
 
         <section class="service-tab-panel active" id="service-client-tab">
           <div class="form-grid">
           <label class="field-with-action span-2">
             Cliente
-            <input id="service-client" name="client" autocomplete="off" required>
+            <span class="embedded-combo client-combo">
+              <span class="embedded-combo-icon"><img src="assets/icons/cliente-field.svg" alt=""></span>
+              <input id="service-client" name="client" autocomplete="off" placeholder="Seleccione un cliente" required>
+              <button class="combo-action" type="button" id="quick-new-client" title="Nuevo cliente" aria-label="Nuevo cliente">
+                <img src="assets/icons/nuevo.svg" alt="">
+              </button>
+              <button class="combo-action" type="button" id="quick-edit-client" title="Editar cliente" aria-label="Editar cliente">
+                <img src="assets/icons/editar.svg" alt="">
+              </button>
+            </span>
             <datalist id="service-client-list"></datalist>
             <div class="combo-menu" id="service-client-menu"></div>
-            <button class="ghost-button field-action" type="button" id="quick-new-client">Nuevo</button>
-            <button class="ghost-button field-action field-action-secondary" type="button" id="quick-edit-client">Editar</button>
           </label>
           <label class="field-with-action span-2">
             Equipo
             <select class="hidden-select" id="service-equipment" name="equipment" required></select>
-            <div class="icon-select" id="service-equipment-picker">
+            <div class="icon-select embedded-combo equipment-combo" id="service-equipment-picker">
               <button class="icon-select-trigger" type="button" id="service-equipment-trigger">Sin equipos cargados</button>
+              <button class="combo-action" type="button" id="quick-new-equipment" title="Nuevo equipo" aria-label="Nuevo equipo">
+                <img src="assets/icons/nuevo.svg" alt="">
+              </button>
+              <button class="combo-action" type="button" id="quick-edit-equipment" title="Editar equipo" aria-label="Editar equipo">
+                <img src="assets/icons/editar.svg" alt="">
+              </button>
               <div class="icon-select-menu" id="service-equipment-menu"></div>
             </div>
-            <button class="ghost-button field-action" type="button" id="quick-new-equipment">Nuevo</button>
-            <button class="ghost-button field-action field-action-secondary" type="button" id="quick-edit-equipment">Editar</button>
           </label>
           <p class="inline-warning span-2 hidden" id="service-no-equipment">
             El cliente actual no posee ningun equipo cargado, cargue uno nuevo para continuar.
           </p>
           <label class="span-2">
             Accesorios
-            <input id="service-accessories" name="accessories" autocomplete="off">
+            <span class="embedded-combo accessories-combo">
+              <span class="embedded-combo-icon"><img src="assets/icons/accessories-field.svg" alt=""></span>
+              <input id="service-accessories" name="accessories" autocomplete="off" placeholder="Accesorios recibidos">
+            </span>
           </label>
           </div>
         </section>
 
         <section class="service-tab-panel" id="service-diagnosis-tab">
-          <div class="service-workbench">
+          <div class="service-workbench diagnosis-workbench">
             <input id="service-failure" name="failure" type="hidden">
-            <div class="service-entry-group">
-              <div class="service-entry-title">Problemas o fallas del equipo</div>
-              <table class="mini-table">
+            <div class="service-entry-group" id="service-issues-group">
+              <table class="mini-table keep-empty">
                 <thead>
                   <tr>
-                    <th>Falla</th>
+                    <th>Fallas reportadas</th>
                     <th></th>
                   </tr>
                 </thead>
                 <tbody id="service-issues-body"></tbody>
               </table>
-              <div class="work-entry">
+              <div id="service-issue-entry-slot"></div>
+              <div class="work-entry" id="service-issue-entry">
                 <label>
-                  Falla reportada
-                  <input id="issue-description" autocomplete="off">
+                  <span class="sr-only">Agregar falla reportada</span>
+                  <span class="embedded-combo entry-combo">
+                    <span class="embedded-combo-icon"><img src="assets/icons/falla-field.svg" alt=""></span>
+                    <input id="issue-description" autocomplete="off" placeholder="Introduzca las fallas reportadas por el cliente">
+                    <button class="combo-action" type="button" id="add-issue" title="Agregar falla" aria-label="Agregar falla">
+                      <img src="assets/icons/nuevo.svg" alt="">
+                    </button>
+                  </span>
                 </label>
-                <button class="ghost-button" type="button" id="add-issue">Agregar</button>
               </div>
             </div>
-            <div class="service-entry-group">
-              <div class="service-entry-title">Trabajos a realizar</div>
-              <table class="mini-table">
+            <div class="service-entry-group" id="requested-work-group">
+              <table class="mini-table keep-empty">
                 <thead>
                   <tr>
                     <th>Trabajo a realizar</th>
@@ -666,72 +710,75 @@
                 </thead>
                 <tbody id="requested-works-body"></tbody>
               </table>
-              <div class="work-entry">
+              <div id="requested-work-entry-slot"></div>
+              <div class="work-entry" id="requested-work-entry">
                 <label>
-                  Trabajo solicitado
-                  <input id="requested-work-description" autocomplete="off">
+                  <span class="sr-only">Agregar trabajo a realizar</span>
+                  <span class="embedded-combo entry-combo">
+                    <span class="embedded-combo-icon"><img src="assets/icons/trabajo-field.svg" alt=""></span>
+                    <input id="requested-work-description" autocomplete="off" placeholder="Introduzca los trabajos especificados por el cliente">
+                    <button class="combo-action" type="button" id="add-requested-work" title="Agregar trabajo" aria-label="Agregar trabajo">
+                      <img src="assets/icons/nuevo.svg" alt="">
+                    </button>
+                  </span>
                 </label>
-                <button class="ghost-button" type="button" id="add-requested-work">Agregar</button>
+              </div>
+            </div>
+            <div class="service-entry-group service-execution-group hidden" id="service-execution-group">
+              <table class="mini-table service-works-table">
+                <thead>
+                  <tr>
+                    <th>Falla / Trabajo</th>
+                    <th>Hecho / Solucionado</th>
+                    <th>Comentario / motivo</th>
+                    <th>Tecnico</th>
+                    <th>Precio</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="service-works-body"></tbody>
+              </table>
+
+              <div class="service-entry-section">
+                <div class="service-entry-title">Fallas / Trabajos especificados por el cliente</div>
+                <div id="service-execution-requested-work-slot"></div>
+                <div id="service-execution-issue-slot"></div>
+              </div>
+
+              <div class="service-entry-section">
+                <div class="service-entry-title">Trabajos extra</div>
+                <div class="work-entry extra-work-entry">
+                  <label>
+                    <span class="sr-only">Trabajos extra</span>
+                    <span class="embedded-combo extra-work-combo">
+                      <span class="embedded-combo-icon">
+                        <img src="assets/icons/trabajo-field.svg" alt="">
+                      </span>
+                      <input id="work-description" list="frequent-work-list" autocomplete="off" placeholder="Introduzca los trabajos extra realizados (no pedidos por el cliente)">
+                    </span>
+                    <datalist id="frequent-work-list"></datalist>
+                  </label>
+                  <label>
+                    <span class="sr-only">Precio</span>
+                    <input id="work-price" inputmode="numeric" autocomplete="off" placeholder="Precio">
+                  </label>
+                  <label>
+                    <span class="sr-only">Tecnico</span>
+                    <select id="work-technician">
+                      <option value="">Sin asignar</option>
+                    </select>
+                  </label>
+                  <button class="ghost-button" type="button" id="add-work">Agregar a la lista</button>
+                  <button class="ghost-button preset-button" type="button" id="save-work-preset">Agregar a predeterminado</button>
+                </div>
               </div>
             </div>
           </div>
-          <div class="form-grid">
+          <div class="form-grid service-diagnosis-grid">
             <label class="span-2">
               Diagnostico
               <textarea id="service-diagnosis" name="diagnosis" rows="2"></textarea>
             </label>
-          </div>
-        </section>
-
-        <section class="service-tab-panel" id="service-status-tab">
-          <div class="form-grid">
-            <label class="span-2">
-              Estado
-              <span class="select-shell">
-                <select id="service-status" name="status">
-                  <option value="Sin revisar">Sin ver</option>
-                  <option value="Revisado">Finalizado</option>
-                  <option>Revision demorada</option>
-                  <option>Retiro demorado</option>
-                  <option>Entregado</option>
-                  <option>Cancelado</option>
-                </select>
-              </span>
-            </label>
-          </div>
-        </section>
-
-        <section class="service-tab-panel" id="service-work-tab">
-          <div class="service-workbench">
-          <table class="mini-table service-works-table">
-            <thead>
-              <tr>
-                <th>Trabajo realizado</th>
-                <th>Hecho</th>
-                <th>Comentario / motivo</th>
-                <th>Precio</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="service-works-body"></tbody>
-          </table>
-          <div class="work-entry">
-            <label>
-              Trabajo extra
-              <input id="work-description" list="frequent-work-list" autocomplete="off">
-              <datalist id="frequent-work-list"></datalist>
-            </label>
-            <label>
-              Precio
-              <input id="work-price" inputmode="numeric" autocomplete="off">
-            </label>
-            <label>
-              Comentario
-              <input id="work-note" autocomplete="off">
-            </label>
-            <button class="ghost-button" type="button" id="add-work">Agregar</button>
-            <button class="ghost-button" type="button" id="save-work-preset">Agregar a predeterminado</button>
-          </div>
           </div>
         </section>
 
@@ -748,7 +795,7 @@
             </thead>
             <tbody id="service-parts-body"></tbody>
           </table>
-          <div class="work-entry">
+          <div class="work-entry parts-entry">
             <label>
               Repuesto
               <input id="part-product" list="part-product-list" autocomplete="off">
@@ -756,43 +803,12 @@
             </label>
             <label>
               Cantidad
-              <input id="part-quantity" inputmode="numeric" placeholder="1" autocomplete="off">
+              <input id="part-quantity" type="number" min="1" step="1" inputmode="numeric" placeholder="1" autocomplete="off">
             </label>
-            <button class="ghost-button" type="button" id="add-part">Agregar</button>
+            <button class="ghost-button" type="button" id="add-part">Agregar a la lista</button>
             <span class="action-separator" aria-hidden="true"></span>
             <button class="ghost-button" type="button" id="quick-new-part">Nuevo</button>
             <button class="ghost-button" type="button" id="quick-edit-part">Editar</button>
-          </div>
-          </div>
-        </section>
-
-        <section class="service-tab-panel" id="service-derived-tab">
-          <div class="service-workbench">
-          <table class="mini-table">
-            <thead>
-              <tr>
-                <th>Tecnico</th>
-                <th>Trabajo</th>
-                <th>Precio</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="external-works-body"></tbody>
-          </table>
-          <div class="service-total">
-            <label>
-              Tecnico / tercero
-              <input id="service-derived" autocomplete="off">
-            </label>
-            <label>
-              Trabajo derivado
-              <input id="external-work" autocomplete="off">
-            </label>
-            <label>
-              Precio
-              <input id="external-cost" inputmode="numeric" autocomplete="off">
-            </label>
-            <button class="ghost-button" type="button" id="add-external-work">Agregar</button>
           </div>
           </div>
         </section>
