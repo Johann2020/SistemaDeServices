@@ -1744,6 +1744,7 @@ function renderServices() {
     const partsTooltip = servicePartsTooltip(service);
     const accessoriesSummary = serviceAccessoriesSummary(service);
     const accessoriesTooltip = serviceAccessoriesTooltip(service);
+    const totalTooltip = serviceTotalTooltip(service);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(service.id)}</td>
@@ -1757,7 +1758,7 @@ function renderServices() {
       <td>${dateWithAgeHtml(service.entryDate)}</td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(serviceFinalizedTooltip(service))}">${dateWithAgeHtml(service.finishDate)}</td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(serviceDeliveredTooltip(service))}">${dateWithAgeHtml(service.deliveryDate)}</td>
-      <td><strong>${money(service.total)}</strong></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(totalTooltip)}"><strong>${money(service.total)}</strong></td>
     `;
     markSelectedRow("services", service.id, tr);
     tr.addEventListener("click", () => {
@@ -3564,8 +3565,8 @@ function keepSavedServiceVisible(id) {
 }
 
 function getServiceFormData() {
-  const worksTotal = state.serviceWorks.reduce((sum, work) => sum + work.price, 0);
-  const partsTotal = state.serviceParts.reduce((sum, part) => sum + part.quantity * part.salePrice, 0);
+  const worksTotal = serviceWorksTotal({ works: state.serviceWorks });
+  const partsTotal = servicePartsTotal({ parts: state.serviceParts });
   const failureText = state.serviceIssues.map((issue) => issue.comment ? `${issue.description} (${issue.comment})` : issue.description).join(" | ");
   els.serviceFields.failure.value = failureText;
   return {
@@ -4030,8 +4031,8 @@ function renderServiceParts() {
 }
 
 function refreshServiceTotal() {
-  const worksTotal = state.serviceWorks.reduce((sum, work) => sum + work.price, 0);
-  const partsTotal = state.serviceParts.reduce((sum, part) => sum + part.quantity * part.salePrice, 0);
+  const worksTotal = serviceWorksTotal({ works: state.serviceWorks });
+  const partsTotal = servicePartsTotal({ parts: state.serviceParts });
   els.serviceTotal.textContent = money(worksTotal + partsTotal);
 }
 
@@ -4917,6 +4918,25 @@ function servicePartsTooltip(service) {
       return `${quantityText}${partProductLabel(part)}${priceText}${providerText}${warrantyText ? `\nGarantia: ${warrantyText}` : ""}`;
     })
     .join("\n");
+}
+
+function serviceWorksTotal(service) {
+  return (service.works || []).reduce((sum, work) => sum + Number(work.price || 0), 0);
+}
+
+function servicePartsTotal(service) {
+  return (service.parts || []).reduce((sum, part) => sum + Number(part.quantity || 0) * Number(part.salePrice || 0), 0);
+}
+
+function serviceTotalTooltip(service) {
+  const worksTotal = serviceWorksTotal(service);
+  const partsTotal = servicePartsTotal(service);
+  const total = Number(service?.total ?? worksTotal + partsTotal);
+  const lines = [];
+  if ((service.works || []).length) lines.push(`Trabajos: ${money(worksTotal)}`);
+  if ((service.parts || []).length) lines.push(`Repuestos: ${money(partsTotal)}`);
+  lines.push(`Total cobrado: ${money(total)}`);
+  return lines.join("\n");
 }
 
 function serviceDerivationSummary(service) {
