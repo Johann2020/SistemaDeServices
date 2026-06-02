@@ -65,6 +65,7 @@ const els = {
   servicesView: document.querySelector("#services-view"),
   settingsView: document.querySelector("#settings-view"),
   quickAction: document.querySelector("#quick-action"),
+  serviceToolbar: document.querySelector("#service-toolbar"),
   search: document.querySelector("#client-search"),
   equipmentSearch: document.querySelector("#equipment-search"),
   productSearch: document.querySelector("#product-search"),
@@ -426,6 +427,7 @@ function wireEvents() {
   });
 
   els.quickAction.addEventListener("click", handleQuickAction);
+  els.serviceToolbar?.addEventListener("click", handleServiceToolbarClick);
   els.search.addEventListener("input", () => {
     resetTablePage("clients");
     renderClients();
@@ -446,8 +448,30 @@ function wireEvents() {
   els.filterAll.addEventListener("change", handleFilterAll);
   els.serviceFilters.forEach((filter) => filter.addEventListener("change", handleFilterOne));
   els.statusFilterCards.forEach((card) => {
-    card.addEventListener("click", () => applyServiceStatusFilter(card.dataset.statusFilter));
+    card.addEventListener("click", async (event) => {
+      const serviceFilter = card.querySelector(".service-filter");
+      const clickedInput = Boolean(event.target.closest?.(".service-filter"));
+      if (serviceFilter) {
+        if (clickedInput) return;
+        const selectedService = currentView() === "services" && state.selectedRow?.type === "services"
+          ? getServiceRecord(state.selectedRow.id)
+          : null;
+        const quickAction = selectedService ? serviceStatusQuickAction(card.dataset.statusFilter) : null;
+        if (selectedService && quickAction) {
+          event.preventDefault();
+          event.stopPropagation();
+          await executeActionMenuAction(quickAction.action, {
+            type: "services",
+            id: selectedService.id,
+            item: selectedService,
+          });
+        }
+        return;
+      }
+      applyServiceStatusFilter(card.dataset.statusFilter);
+    });
   });
+  els.servicesBody.addEventListener("click", handleServiceStatusQuickAction);
   els.closeDialog.addEventListener("click", closeClientDialog);
   els.cancelDialog.addEventListener("click", closeClientDialog);
   els.form.addEventListener("submit", saveClient);
@@ -669,6 +693,7 @@ function showView(view) {
     els.quickAction.innerHTML = "<span>＋</span>Nuevo cliente";
   }
 
+  updateServiceTopActions();
 }
 
 function showMessage(title, text, type = "info", mode = "ok", choices = []) {
@@ -742,6 +767,89 @@ function handleQuickAction() {
     els.settingsFields.marginType.focus();
   }
   else openClientDialog();
+}
+
+function updateServiceTopActions() {
+  const isServicesView = currentView() === "services";
+  els.quickAction?.classList.toggle("hidden", isServicesView);
+  els.serviceToolbar?.classList.toggle("hidden", !isServicesView);
+  if (!els.serviceToolbar) return;
+
+  if (!isServicesView) {
+    els.serviceToolbar.innerHTML = "";
+    return;
+  }
+
+  const selectedVisible = Boolean(els.servicesBody?.querySelector("tr.selected-row"));
+  const service = isServicesView && selectedVisible && state.selectedRow?.type === "services"
+    ? getServiceRecord(state.selectedRow.id)
+    : null;
+  const selectedActions = service ? actionMenuItems("services", service.id, service) : [];
+  const findAction = (action) => selectedActions.find((item) => item.action === action);
+  const primaryActions = [
+    { action: "new-service", label: "Nuevo servicio" },
+    findAction("edit"),
+    findAction("delete"),
+  ].filter(Boolean);
+  const statusActions = [
+    findAction("finish-service"),
+    findAction("deliver-service"),
+    findAction("cancel-service"),
+  ].filter(Boolean);
+  const historyActions = [
+    findAction("client-history"),
+    findAction("equipment-history"),
+  ].filter(Boolean);
+  const actions = [
+    ...primaryActions,
+    ...(statusActions.length ? [{ separator: true }, ...statusActions] : []),
+    ...(historyActions.length ? [{ separator: true }, ...historyActions] : []),
+  ];
+
+  els.serviceToolbar.innerHTML = actions.map((item) => item.separator
+    ? `<span class="service-toolbar-separator" aria-hidden="true"></span>`
+    : `
+      <button class="service-toolbar-button service-toolbar-${escapeHtml(item.action)}" type="button" data-service-toolbar-action="${escapeHtml(item.action)}" data-tooltip="${escapeHtml(item.label)}" aria-label="${escapeHtml(item.label)}">
+        <img src="assets/icons/${escapeHtml(actionIconName(item.action, item.label))}" alt="">
+      </button>
+  `).join("");
+}
+
+async function handleServiceStatusQuickAction(event) {
+  const button = event.target.closest?.("[data-service-status-action]");
+  if (!button || !els.servicesBody.contains(button)) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const id = Number(button.dataset.serviceId || 0);
+  if (!id) return;
+  const service = getServiceRecord(id);
+  const row = button.closest("tr");
+  if (!service || !row) return;
+
+  selectRow("services", id, row);
+  await executeActionMenuAction(button.dataset.serviceStatusAction, { type: "services", id, item: service });
+}
+
+async function handleServiceToolbarClick(event) {
+  const button = event.target.closest?.("[data-service-toolbar-action]");
+  if (!button) return;
+  const action = button.dataset.serviceToolbarAction;
+  if (action === "new-service") {
+    openServiceDialog();
+    return;
+  }
+  if (currentView() !== "services" || state.selectedRow?.type !== "services") {
+    updateServiceTopActions();
+    return;
+  }
+  const id = state.selectedRow.id;
+  const service = getServiceRecord(id);
+  if (!service) {
+    updateServiceTopActions();
+    return;
+  }
+  await executeActionMenuAction(action, { type: "services", id, item: service });
 }
 
 function currentView() {
@@ -1482,6 +1590,27 @@ function decorateActionButtons(root = document) {
   });
 }
 
+function actionIconName(action, label = "") {
+  const icons = {
+    "new-service": "nuevo.svg",
+    edit: "editar.svg",
+    delete: "eliminar.svg",
+    "client-history": "clientes.svg",
+    "equipment-history": "equipos.svg",
+    "finish-service": "aceptar.svg",
+    "deliver-service": "entregar.svg",
+    "cancel-service": "cancelar.svg",
+  };
+  if (icons[action]) return icons[action];
+  const normalized = String(label).toLowerCase();
+  if (normalized.startsWith("finalizar")) return "aceptar.svg";
+  if (normalized.startsWith("entregar")) return "entregar.svg";
+  if (normalized.startsWith("cancelar")) return "cancelar.svg";
+  if (normalized.startsWith("editar")) return "editar.svg";
+  if (normalized.startsWith("eliminar")) return "eliminar.svg";
+  return "nuevo.svg";
+}
+
 function setupRichTooltips() {
   if (document.querySelector(".app-tooltip")) return;
   const tooltip = document.createElement("div");
@@ -1534,6 +1663,15 @@ function showRichTooltip(tooltip, target) {
     .map((line) => line.trim())
     .filter(Boolean);
   if (!lines.length) return;
+  if (target.classList.contains("service-toolbar-button") ||
+      target.classList.contains("combo-action") ||
+      target.classList.contains("service-status-pill") ||
+      target.classList.contains("status-quick-action")) {
+    tooltip.innerHTML = `<div class="app-tooltip-compact">${escapeHtml(lines[0])}</div>`;
+    tooltip.classList.add("visible", "compact");
+    positionRichTooltip(tooltip, target);
+    return;
+  }
   const footer = target.classList.contains("linked-cell")
     ? `<div class="app-tooltip-footer"><span>i</span> Click para editar</div>`
     : "";
@@ -1585,7 +1723,7 @@ function positionRichTooltip(tooltip, target) {
 }
 
 function hideRichTooltip(tooltip) {
-  tooltip.classList.remove("visible", "above");
+  tooltip.classList.remove("visible", "above", "compact");
 }
 
 function renderMetrics() {
@@ -1782,10 +1920,22 @@ function renderServices() {
     const accessoriesSummary = serviceAccessoriesSummary(service);
     const accessoriesTooltip = serviceAccessoriesTooltip(service);
     const totalTooltip = serviceTotalTooltip(service);
+    const quickStatusAction = serviceStatusQuickAction(service.status);
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(service.id)}</td>
-      <td><span class="status-pill ${statusClass(service.status)}">${escapeHtml(displayServiceStatusLabel(service.status))}</span></td>
+      <td>
+        <button
+        class="status-pill ${statusClass(service.status)} service-status-pill status-quick-action"
+        type="button"
+        data-service-status-action="${escapeHtml(quickStatusAction.action)}"
+        data-service-id="${escapeHtml(service.id)}"
+        data-tooltip="${escapeHtml(quickStatusAction.tooltip)}"
+        aria-label="${escapeHtml(quickStatusAction.tooltip)}"
+        >
+          ${escapeHtml(displayServiceStatusLabel(service.status))}
+        </button>
+      </td>
       <td class="linked-cell" data-open-client="${escapeHtml(client?.id || "")}" data-tooltip="${escapeHtml(clientTooltip(client))}"><strong>${escapeHtml(client?.name || "Sin cliente")}</strong></td>
       <td class="linked-cell" data-open-equipment="${escapeHtml(equipment?.id || "")}" data-tooltip="${escapeHtml(equipmentTooltip(equipment))}">${deviceLabelHtml(equipment)}</td>
       <td class="tooltip-cell" data-tooltip="${escapeHtml(accessoriesTooltip)}"><span class="cell-ellipsis">${escapeHtml(accessoriesSummary || "---")}</span></td>
@@ -1821,6 +1971,26 @@ function renderServices() {
 
   els.emptyServices.classList.toggle("visible", pageData.total === 0);
   renderPagination("services", pageData);
+  updateServiceTopActions();
+}
+
+function serviceStatusQuickAction(status) {
+  if (["Sin revisar", "Revision demorada"].includes(status)) {
+    return {
+      action: "finish-service",
+      tooltip: "Click para finalizar",
+    };
+  }
+  if (["Revisado", "Retiro demorado"].includes(status)) {
+    return {
+      action: "deliver-service",
+      tooltip: "Click para entregar",
+    };
+  }
+  return {
+    action: "edit",
+    tooltip: "Click para editar el service",
+  };
 }
 
 function renderServiceFilterControls() {
@@ -1940,6 +2110,10 @@ async function handleActionMenuClick(event) {
   }
 
   const action = button.dataset.actionMenuAction;
+  await executeActionMenuAction(action, record);
+}
+
+async function executeActionMenuAction(action, record) {
   if (action === "edit") {
     closeActionMenu();
     if (record.type === "clients") openClientDialog(record.id);
@@ -1974,8 +2148,17 @@ async function handleActionMenuClick(event) {
     renderServiceWorks();
     showServiceTab("service-diagnosis-tab");
   } else if (action === "deliver-service") {
+    const service = record.item || getServiceRecord(record.id);
+    const client = service ? getClientRecord(service.clientId) : null;
+    const confirmed = await showMessage(
+      "Confirmar entrega",
+      `Marcar como entregado el service de ${client?.name || "cliente eliminado"} (#${record.id})?`,
+      "warning",
+      "confirm"
+    );
+    if (!confirmed) return;
     closeActionMenu();
-    await changeServiceStatus(record.id, "Entregado", record.item);
+    await changeServiceStatus(record.id, "Entregado", service);
   } else if (action === "cancel-service") {
     closeActionMenu();
     await changeServiceStatus(record.id, "Cancelado", record.item);
@@ -2188,6 +2371,7 @@ function selectRow(type, id, row) {
   document.querySelectorAll("tbody tr.selected-row").forEach((tr) => tr.classList.remove("selected-row"));
   row.classList.add("selected-row");
   state.selectedRow = { type, id };
+  updateServiceTopActions();
 }
 
 function markSelectedRow(type, id, row) {
@@ -3674,6 +3858,8 @@ function openServiceDialog(id = null) {
   els.serviceError.textContent = "";
   els.serviceForm.reset();
   els.serviceDialogTitle.textContent = id ? "Editar servicio" : "Nuevo servicio";
+  els.serviceDialog.classList.toggle("compact-service-dialog", !id);
+  els.serviceDialog.classList.toggle("balanced-service-dialog", Boolean(id));
   refreshServiceClientDatalist();
 
   const service = getServiceRecord(id);

@@ -60,10 +60,12 @@
             <p class="eyebrow">Sistema web</p>
             <h1 id="view-title">Inicio</h1>
           </div>
-          <button class="primary-action" type="button" id="quick-action">
-            <span>＋</span>
-            Nuevo cliente
-          </button>
+          <div class="topbar-actions">
+            <button class="primary-action" type="button" id="quick-action">
+              <span>＋</span>
+              Nuevo cliente
+            </button>
+          </div>
         </header>
 
         <section class="view active" id="home-view">
@@ -136,7 +138,7 @@
         <section class="view" id="clients-view">
           <div class="toolbar">
             <label class="search-field">
-              <span>⌕</span>
+              <span class="search-icon" aria-hidden="true"></span>
               <input id="client-search" type="search" placeholder="Buscar por nombre, telefono, documento o localidad">
             </label>
           </div>
@@ -168,7 +170,7 @@
         <section class="view" id="equipment-view">
           <div class="toolbar">
             <label class="search-field">
-              <span>⌕</span>
+              <span class="search-icon" aria-hidden="true"></span>
               <input id="equipment-search" type="search" placeholder="Buscar por cliente, tipo, marca, modelo o serie">
             </label>
           </div>
@@ -200,7 +202,7 @@
         <section class="view" id="products-view">
           <div class="toolbar">
             <label class="search-field">
-              <span>⌕</span>
+              <span class="search-icon" aria-hidden="true"></span>
               <input id="product-search" type="search" placeholder="Buscar por tipo, marca, modelo o caracteristicas">
             </label>
           </div>
@@ -233,10 +235,10 @@
         </section>
 
         <section class="view" id="services-view">
-          <div class="toolbar">
+          <div class="toolbar service-search-toolbar">
             <label class="search-field">
-              <span>⌕</span>
-              <input id="service-search" type="search" placeholder="Buscar por cliente, equipo, estado o falla">
+              <span class="search-icon" aria-hidden="true"></span>
+              <input id="service-search-detached" type="search" placeholder="Buscar por cliente, equipo, estado o falla">
             </label>
           </div>
 
@@ -245,14 +247,30 @@
             <button class="small-button" type="button" id="clear-service-history-filter">Quitar filtro</button>
           </div>
 
-          <div class="filter-strip" aria-label="Filtros por estado">
-            <label><input type="checkbox" id="filter-all" checked> Todos</label>
-            <label><input type="checkbox" class="service-filter" value="Sin revisar"> Sin ver <strong class="filter-strip-count" data-filter-count="Sin revisar">(0)</strong></label>
-            <label><input type="checkbox" class="service-filter" value="Revision demorada"> Revision demorada <strong class="filter-strip-count" data-filter-count="Revision demorada">(0)</strong></label>
-            <label><input type="checkbox" class="service-filter" value="Revisado"> Finalizado <strong class="filter-strip-count" data-filter-count="Revisado">(0)</strong></label>
-            <label><input type="checkbox" class="service-filter" value="Retiro demorado"> Retiro demorado <strong class="filter-strip-count" data-filter-count="Retiro demorado">(0)</strong></label>
-            <label><input type="checkbox" class="service-filter" value="Entregado"> Entregado <strong class="filter-strip-count" data-filter-count="Entregado">(0)</strong></label>
-            <label><input type="checkbox" class="service-filter" value="Cancelado"> Cancelado <strong class="filter-strip-count" data-filter-count="Cancelado">(0)</strong></label>
+          <div class="service-control-row">
+            <section class="service-control-group">
+              <span class="service-control-label">Comandos</span>
+              <div class="service-toolbar hidden" id="service-toolbar" aria-label="Acciones del servicio"></div>
+            </section>
+
+            <section class="service-control-group service-filter-group">
+              <span class="service-control-label">Busqueda y filtros</span>
+              <div class="service-filter-box">
+                <label class="search-field service-inline-search">
+                  <span class="search-icon" aria-hidden="true"></span>
+                  <input id="service-search" type="search" placeholder="Buscar por cliente, equipo, estado o falla">
+                </label>
+                <div class="filter-strip" aria-label="Filtros por estado">
+                  <label><input type="checkbox" id="filter-all" checked> Todos</label>
+                  <label class="status-quick-action" data-status-filter="Sin revisar" data-tooltip="Click para finalizar"><input type="checkbox" class="service-filter" value="Sin revisar"> Sin ver <strong class="filter-strip-count" data-filter-count="Sin revisar">(0)</strong></label>
+                  <label class="status-quick-action" data-status-filter="Revision demorada" data-tooltip="Click para finalizar"><input type="checkbox" class="service-filter" value="Revision demorada"> Revision demorada <strong class="filter-strip-count" data-filter-count="Revision demorada">(0)</strong></label>
+                  <label class="status-quick-action" data-status-filter="Revisado" data-tooltip="Click para entregar"><input type="checkbox" class="service-filter" value="Revisado"> Finalizado <strong class="filter-strip-count" data-filter-count="Revisado">(0)</strong></label>
+                  <label class="status-quick-action" data-status-filter="Retiro demorado" data-tooltip="Click para entregar"><input type="checkbox" class="service-filter" value="Retiro demorado"> Retiro demorado <strong class="filter-strip-count" data-filter-count="Retiro demorado">(0)</strong></label>
+                  <label class="status-quick-action" data-status-filter="Entregado" data-tooltip="Click para editar el service"><input type="checkbox" class="service-filter" value="Entregado"> Entregado <strong class="filter-strip-count" data-filter-count="Entregado">(0)</strong></label>
+                  <label class="status-quick-action" data-status-filter="Cancelado" data-tooltip="Click para editar el service"><input type="checkbox" class="service-filter" value="Cancelado"> Cancelado <strong class="filter-strip-count" data-filter-count="Cancelado">(0)</strong></label>
+                </div>
+              </div>
+            </section>
           </div>
 
           <div class="table-wrap">
@@ -619,7 +637,7 @@
       <form method="dialog" id="pattern-form">
         <div class="dialog-banner">
           <h2>Patron de desbloqueo</h2>
-          <button class="dialog-close" type="button" id="close-pattern-dialog" aria-label="Cerrar">×</button>
+          <button class="icon-button" type="button" id="close-pattern-dialog" aria-label="Cerrar">×</button>
         </div>
         <div class="pattern-dialog-body">
           <div class="pattern-grid" id="pattern-grid" aria-label="Patron de desbloqueo">
@@ -790,7 +808,7 @@
                       <span class="embedded-combo-icon">
                         <img src="assets/icons/trabajo-field.svg" alt="">
                       </span>
-                      <input id="work-description" list="frequent-work-list" autocomplete="off" placeholder="Introduzca los trabajos extra realizados (no pedidos por el cliente)">
+                      <input id="work-description" list="frequent-work-list" autocomplete="off" placeholder="Introduzca los trabajos extra realizados">
                     </span>
                     <datalist id="frequent-work-list"></datalist>
                   </label>
