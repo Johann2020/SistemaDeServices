@@ -9,6 +9,77 @@ const SERVICE_DELAY_STATUSES = {
   review: "Revision demorada",
   pickup: "Retiro demorado",
 };
+const TEXT_REPLACE_SCOPES = {
+  all: {
+    label: "Todos los modulos",
+    buckets: ["clients", "equipment", "products", "services"],
+  },
+  clients: {
+    label: "Clientes",
+    buckets: ["clients"],
+  },
+  equipment: {
+    label: "Equipos",
+    buckets: ["equipment"],
+  },
+  products: {
+    label: "Productos",
+    buckets: ["products"],
+  },
+  services: {
+    label: "Services",
+    buckets: ["services"],
+  },
+};
+
+const TEXT_REPLACE_FIELDS = {
+  all: [
+    { value: "", label: "Todos los campos" },
+  ],
+  clients: [
+    { value: "", label: "Todos los campos" },
+    { value: "name", label: "Nombre" },
+    { value: "document", label: "DNI/CUIT" },
+    { value: "province", label: "Provincia" },
+    { value: "city", label: "Localidad" },
+    { value: "address", label: "Direccion" },
+    { value: "phone1", label: "Telefono 1" },
+    { value: "phone2", label: "Telefono 2" },
+    { value: "comments", label: "Comentarios" },
+  ],
+  equipment: [
+    { value: "", label: "Todos los campos" },
+    { value: "type", label: "Tipo" },
+    { value: "otherType", label: "Otro tipo" },
+    { value: "brand", label: "Marca" },
+    { value: "model", label: "Modelo" },
+    { value: "serial", label: "Nro. serie" },
+    { value: "condition", label: "Estado fisico" },
+    { value: "observations", label: "Observaciones" },
+    { value: "password", label: "Password" },
+  ],
+  products: [
+    { value: "", label: "Todos los campos" },
+    { value: "type", label: "Tipo" },
+    { value: "brand", label: "Marca" },
+    { value: "model", label: "Modelo" },
+    { value: "provider", label: "Proveedor" },
+    { value: "status", label: "Estado" },
+    { value: "features", label: "Caracteristicas" },
+  ],
+  services: [
+    { value: "", label: "Todos los campos" },
+    { value: "status", label: "Estado" },
+    { value: "failure", label: "Falla / Trabajo" },
+    { value: "diagnosis", label: "Diagnostico" },
+    { value: "accessories", label: "Accesorios" },
+    { value: "description", label: "Descripcion" },
+    { value: "comment", label: "Comentario" },
+    { value: "note", label: "Motivo" },
+    { value: "technician", label: "Tecnico" },
+    { value: "productLabel", label: "Repuesto" },
+  ],
+};
 
 const state = {
   clients: loadClients(),
@@ -27,6 +98,7 @@ const state = {
   serviceParts: [],
   serviceIssues: [],
   externalWorks: [],
+  serviceDialogMode: "reception",
   actionMenuRecord: null,
   serviceHistoryFilter: null,
   toastTimers: new Map(),
@@ -48,6 +120,7 @@ const state = {
   },
   remotePages: {},
   remotePageRequests: {},
+  remotePageErrors: {},
 };
 
 const els = {
@@ -64,7 +137,11 @@ const els = {
   productsView: document.querySelector("#products-view"),
   servicesView: document.querySelector("#services-view"),
   settingsView: document.querySelector("#settings-view"),
-  quickAction: document.querySelector("#quick-action"),
+  moduleToolbars: {
+    clients: document.querySelector("#clients-toolbar"),
+    equipment: document.querySelector("#equipment-toolbar"),
+    products: document.querySelector("#products-toolbar"),
+  },
   serviceToolbar: document.querySelector("#service-toolbar"),
   search: document.querySelector("#client-search"),
   equipmentSearch: document.querySelector("#equipment-search"),
@@ -126,6 +203,8 @@ const els = {
   },
   provinceList: document.querySelector("#province-list"),
   cityList: document.querySelector("#city-list"),
+  provinceMenu: document.querySelector("#province-menu"),
+  cityMenu: document.querySelector("#city-menu"),
   equipmentDialog: document.querySelector("#equipment-dialog"),
   equipmentForm: document.querySelector("#equipment-form"),
   equipmentDialogTitle: document.querySelector("#equipment-dialog-title"),
@@ -198,6 +277,8 @@ const els = {
   serviceSummaryBody: document.querySelector("#service-summary-body"),
   serviceIssuesBody: document.querySelector("#service-issues-body"),
   requestedWorksBody: document.querySelector("#requested-works-body"),
+  issueQuickPresets: document.querySelector("#issue-quick-presets"),
+  requestedWorkQuickPresets: document.querySelector("#requested-work-quick-presets"),
   serviceIssuesGroup: document.querySelector("#service-issues-group"),
   serviceIssueEntry: document.querySelector("#service-issue-entry"),
   serviceIssueEntrySlot: document.querySelector("#service-issue-entry-slot"),
@@ -210,6 +291,7 @@ const els = {
   addWork: document.querySelector("#add-work"),
   addPart: document.querySelector("#add-part"),
   addIssue: document.querySelector("#add-issue"),
+  addDetectedIssue: document.querySelector("#add-detected-issue"),
   addRequestedWork: document.querySelector("#add-requested-work"),
   addTechnician: document.querySelector("#add-technician"),
   quickNewClient: document.querySelector("#quick-new-client"),
@@ -223,6 +305,7 @@ const els = {
   partProductList: document.querySelector("#part-product-list"),
   serviceTotal: document.querySelector("#service-total"),
   frequentWorkList: document.querySelector("#frequent-work-list"),
+  frequentWorkMenu: document.querySelector("#frequent-work-menu"),
   serviceFields: {
     client: document.querySelector("#service-client"),
     equipment: document.querySelector("#service-equipment"),
@@ -231,6 +314,7 @@ const els = {
     diagnosis: document.querySelector("#service-diagnosis"),
     accessories: document.querySelector("#service-accessories"),
     issueDescription: document.querySelector("#issue-description"),
+    detectedIssueDescription: document.querySelector("#detected-issue-description"),
     requestedWorkDescription: document.querySelector("#requested-work-description"),
     workDescription: document.querySelector("#work-description"),
     workPrice: document.querySelector("#work-price"),
@@ -242,6 +326,8 @@ const els = {
   serviceEquipmentMenu: document.querySelector("#service-equipment-menu"),
   serviceTabs: [...document.querySelectorAll(".service-tab")],
   serviceTabPanels: [...document.querySelectorAll(".service-tab-panel")],
+  settingsTabs: [...document.querySelectorAll(".settings-tab")],
+  settingsTabPanels: [...document.querySelectorAll(".settings-tab-panel")],
   settingsFields: {
     transportCost: document.querySelector("#transport-cost"),
     marginType: document.querySelector("#margin-type"),
@@ -255,13 +341,12 @@ const els = {
     pickupDelayUnit: document.querySelector("#service-pickup-delay-unit"),
     replaceSearch: document.querySelector("#replace-search"),
     replaceValue: document.querySelector("#replace-value"),
-    mergeTarget: document.querySelector("#merge-target"),
-    mergeValues: document.querySelector("#merge-values"),
+    replaceScopeModule: document.querySelector("#replace-scope-module"),
+    replaceScopeField: document.querySelector("#replace-scope-field"),
   },
   saveTransport: document.querySelector("#save-transport"),
   saveServiceDelays: document.querySelector("#save-service-delays"),
   runReplaceText: document.querySelector("#run-replace-text"),
-  runMergeValues: document.querySelector("#run-merge-values"),
   addMargin: document.querySelector("#add-margin"),
   addFrequentWork: document.querySelector("#add-frequent-work"),
   deleteOrphanClients: document.querySelector("#delete-orphan-clients"),
@@ -426,8 +511,12 @@ function wireEvents() {
     button.addEventListener("click", () => showView(button.dataset.viewLink));
   });
 
-  els.quickAction.addEventListener("click", handleQuickAction);
+  Object.values(els.moduleToolbars).forEach((toolbar) => {
+    toolbar?.addEventListener("click", handleModuleToolbarClick);
+  });
   els.serviceToolbar?.addEventListener("click", handleServiceToolbarClick);
+  els.settingsTabs.forEach((tab) => tab.addEventListener("click", () => showSettingsTab(tab.dataset.settingsTab)));
+  els.settingsFields.replaceScopeModule?.addEventListener("change", refreshReplaceFieldOptions);
   els.search.addEventListener("input", () => {
     resetTablePage("clients");
     renderClients();
@@ -447,27 +536,8 @@ function wireEvents() {
   els.clearServiceHistoryFilter.addEventListener("click", clearServiceHistoryFilter);
   els.filterAll.addEventListener("change", handleFilterAll);
   els.serviceFilters.forEach((filter) => filter.addEventListener("change", handleFilterOne));
-  els.statusFilterCards.forEach((card) => {
+  document.querySelectorAll(".status-card[data-status-filter]").forEach((card) => {
     card.addEventListener("click", async (event) => {
-      const serviceFilter = card.querySelector(".service-filter");
-      const clickedInput = Boolean(event.target.closest?.(".service-filter"));
-      if (serviceFilter) {
-        if (clickedInput) return;
-        const selectedService = currentView() === "services" && state.selectedRow?.type === "services"
-          ? getServiceRecord(state.selectedRow.id)
-          : null;
-        const quickAction = selectedService ? serviceStatusQuickAction(card.dataset.statusFilter) : null;
-        if (selectedService && quickAction) {
-          event.preventDefault();
-          event.stopPropagation();
-          await executeActionMenuAction(quickAction.action, {
-            type: "services",
-            id: selectedService.id,
-            item: selectedService,
-          });
-        }
-        return;
-      }
       applyServiceStatusFilter(card.dataset.statusFilter);
     });
   });
@@ -509,25 +579,35 @@ function wireEvents() {
   els.serviceFields.client.addEventListener("input", () => {
     refreshServiceClientMenu(false);
     refreshServiceEquipmentSelect();
+    syncServiceClientPicker();
   });
   els.serviceFields.client.addEventListener("focus", () => refreshServiceClientMenu(false));
   els.serviceFields.client.addEventListener("click", () => refreshServiceClientMenu(false));
   els.serviceFields.client.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshServiceClientMenu(true), hideServiceClientMenu, els.serviceClientMenu));
   bindEnterToButton([els.serviceFields.issueDescription], els.addIssue);
   bindEnterToButton([els.serviceFields.requestedWorkDescription], els.addRequestedWork);
-  bindEnterToButton([els.serviceFields.workDescription, els.serviceFields.workPrice, els.serviceFields.workTechnician], els.addWork);
+  bindEnterToButton([els.serviceFields.workDescription], els.addWork);
   bindEnterToButton([els.serviceFields.partProduct, els.serviceFields.partQuantity], els.addPart);
   els.serviceFields.status.addEventListener("change", () => {
     configureServiceTabs(false);
     refreshServiceTotal();
   });
-  els.serviceFields.workDescription.addEventListener("input", fillFrequentWorkPrice);
+  els.serviceFields.workDescription.addEventListener("input", () => {
+    fillFrequentWorkPrice();
+    refreshFrequentWorkMenu(false);
+  });
+  els.serviceFields.workDescription.addEventListener("focus", () => refreshFrequentWorkMenu(false));
+  els.serviceFields.workDescription.addEventListener("click", () => refreshFrequentWorkMenu(false));
+  els.serviceFields.workDescription.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshFrequentWorkMenu(true), hideFrequentWorkMenu, els.frequentWorkMenu));
   [
     els.serviceFields.workPrice,
     els.serviceFields.partQuantity,
-  ].forEach(restrictInputToNumber);
+  ].filter(Boolean).forEach(restrictInputToNumber);
   els.addIssue.addEventListener("click", addServiceIssue);
+  els.addDetectedIssue?.addEventListener("click", addDetectedIssue);
   els.addRequestedWork.addEventListener("click", addRequestedServiceWork);
+  els.issueQuickPresets?.addEventListener("click", (event) => handleQuickPresetClick(event, "issue"));
+  els.requestedWorkQuickPresets?.addEventListener("click", (event) => handleQuickPresetClick(event, "requested"));
   els.addWork.addEventListener("click", addServiceWork);
   els.addPart.addEventListener("click", addServicePart);
   els.serviceTabs.forEach((tab) => tab.addEventListener("click", () => showServiceTab(tab.dataset.serviceTab)));
@@ -541,7 +621,6 @@ function wireEvents() {
   els.saveTransport.addEventListener("click", saveTransportCost);
   els.saveServiceDelays?.addEventListener("click", saveServiceDelaySettings);
   els.runReplaceText?.addEventListener("click", runMassTextReplace);
-  els.runMergeValues?.addEventListener("click", runMassValueMerge);
   els.addMargin.addEventListener("click", addMargin);
   els.addFrequentWork.addEventListener("click", addFrequentWork);
   els.addTechnician?.addEventListener("click", addTechnician);
@@ -552,6 +631,7 @@ function wireEvents() {
   document.addEventListener("click", closeActionMenu);
   document.addEventListener("click", hideServiceClientMenuOnOutsideClick);
   document.addEventListener("click", hideServiceEquipmentMenuOnOutsideClick);
+  document.addEventListener("click", hideFrequentWorkMenuOnOutsideClick);
   document.addEventListener("click", hideEquipmentClientMenuOnOutsideClick);
   document.addEventListener("click", hideProductTypeMenuOnOutsideClick);
   document.addEventListener("click", hideProductBrandMenuOnOutsideClick);
@@ -559,6 +639,8 @@ function wireEvents() {
   document.addEventListener("click", hideEquipmentBrandMenuOnOutsideClick);
   document.addEventListener("click", hideEquipmentModelMenuOnOutsideClick);
   document.addEventListener("click", hideEquipmentTypeMenuOnOutsideClick);
+  document.addEventListener("click", hideProvinceMenuOnOutsideClick);
+  document.addEventListener("click", hideCityMenuOnOutsideClick);
   els.equipmentFields.type.addEventListener("change", updateEquipmentVisibility);
   els.equipmentFields.type.addEventListener("change", updateBrandSuggestions);
   els.equipmentFields.type.addEventListener("change", syncEquipmentTypePicker);
@@ -610,11 +692,24 @@ function wireEvents() {
     }
   });
 
-  els.fields.province.addEventListener("change", () => loadCities(els.fields.province.value));
   els.fields.province.addEventListener("input", () => {
     els.fields.city.value = "";
     clearDatalist(els.cityList);
+    state.cities = [];
+    refreshProvinceMenu(false);
   });
+  els.fields.province.addEventListener("change", () => {
+    if (listIncludesLoose(state.provinces, els.fields.province.value)) {
+      loadCities(els.fields.province.value);
+    }
+  });
+  els.fields.province.addEventListener("focus", () => refreshProvinceMenu(false));
+  els.fields.province.addEventListener("click", () => refreshProvinceMenu(false));
+  els.fields.province.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshProvinceMenu(true), hideProvinceMenu, els.provinceMenu));
+  els.fields.city.addEventListener("input", () => refreshCityMenu(false));
+  els.fields.city.addEventListener("focus", () => refreshCityMenu(false));
+  els.fields.city.addEventListener("click", () => refreshCityMenu(false));
+  els.fields.city.addEventListener("keydown", (event) => handleSuggestKeydown(event, () => refreshCityMenu(true), hideCityMenu, els.cityMenu));
 }
 
 function bindEnterToButton(fields, button) {
@@ -675,24 +770,20 @@ function showView(view) {
 
   if (view === "clients") {
     els.title.textContent = "Clientes";
-    els.quickAction.innerHTML = "<span>＋</span>Nuevo cliente";
   } else if (view === "equipment") {
     els.title.textContent = "Equipos";
-    els.quickAction.innerHTML = "<span>＋</span>Nuevo equipo";
   } else if (view === "products") {
     els.title.textContent = "Productos";
-    els.quickAction.innerHTML = "<span>＋</span>Nuevo producto";
   } else if (view === "services") {
     els.title.textContent = "Servicios";
-    els.quickAction.innerHTML = "<span>＋</span>Nuevo servicio";
   } else if (view === "settings") {
     els.title.textContent = "Configuracion";
-    els.quickAction.innerHTML = "<span>＋</span>Nuevo margen";
+    showSettingsTab();
   } else {
     els.title.textContent = "Inicio";
-    els.quickAction.innerHTML = "<span>＋</span>Nuevo cliente";
   }
 
+  updateModuleToolbars();
   updateServiceTopActions();
 }
 
@@ -758,20 +849,132 @@ function closeMessage(result) {
   }
 }
 
-function handleQuickAction() {
-  const active = document.querySelector(".nav-item.active")?.dataset.view;
-  if (active === "equipment") openEquipmentDialog();
-  else if (active === "products") openProductDialog();
-  else if (active === "services") openServiceDialog();
-  else if (active === "settings") {
-    els.settingsFields.marginType.focus();
+function getSelectedRowForCurrentView() {
+  const viewMap = {
+    clients: "clients",
+    equipment: "equipment",
+    products: "products",
+    services: "services",
+  };
+  const view = currentView();
+  if (!state.selectedRow || state.selectedRow.type !== viewMap[view]) return null;
+  return state.selectedRow;
+}
+
+function renderToolbarButton(item) {
+  if (item.separator) return `<span class="service-toolbar-separator" aria-hidden="true"></span>`;
+  const disabled = item.disabled ? " disabled aria-disabled=\"true\"" : "";
+  const className = item.className ? `service-toolbar-button ${item.className}` : "service-toolbar-button";
+  return `
+    <button class="${escapeHtml(className)}"
+      type="button"
+      data-module-toolbar-action="${escapeHtml(item.action)}"
+      data-tooltip="${escapeHtml(item.label)}"
+      aria-label="${escapeHtml(item.label)}"${disabled}>
+      <img src="assets/icons/${escapeHtml(actionIconName(item.action, item.label))}" alt="">
+    </button>
+  `;
+}
+
+function updateModuleToolbars() {
+  const actionsByView = {
+    clients: [
+      { action: "new-client", label: "Nuevo cliente" },
+      { action: "edit-client", label: "Editar", needsSelection: true },
+      { action: "delete-client", label: "Eliminar", needsSelection: true },
+      { separator: true },
+      { action: "client-history", label: "Historial cliente", needsSelection: true },
+    ],
+    equipment: [
+      { action: "new-equipment", label: "Nuevo equipo" },
+      { action: "edit-equipment", label: "Editar", needsSelection: true },
+      { action: "delete-equipment", label: "Eliminar", needsSelection: true },
+      { separator: true },
+      { action: "equipment-history", label: "Historial equipo", needsSelection: true },
+    ],
+    products: [
+      { action: "new-product", label: "Nuevo producto" },
+      { action: "edit-product", label: "Editar", needsSelection: true },
+      { action: "delete-product", label: "Eliminar", needsSelection: true },
+    ],
+  };
+
+  Object.entries(els.moduleToolbars).forEach(([viewName, toolbar]) => {
+    if (!toolbar) return;
+    const selected = state.selectedRow?.type === viewName ? state.selectedRow : null;
+    const actions = (actionsByView[viewName] || []).map((item) => ({
+      ...item,
+      disabled: item.needsSelection && !selected,
+    }));
+    toolbar.innerHTML = actions.map(renderToolbarButton).join("");
+    toolbar.classList.toggle("hidden", !actions.length);
+  });
+}
+
+async function handleModuleToolbarClick(event) {
+  const button = event.target.closest?.("[data-module-toolbar-action]");
+  if (!button || button.disabled || button.getAttribute("aria-disabled") === "true") return;
+  const action = button.dataset.moduleToolbarAction;
+
+  if (action === "new-client") {
+    openClientDialog();
+    return;
   }
-  else openClientDialog();
+  if (action === "new-equipment") {
+    openEquipmentDialog();
+    return;
+  }
+  if (action === "new-product") {
+    openProductDialog();
+    return;
+  }
+  if (action === "new-margin") {
+    const activePanel = document.querySelector(".settings-tab-panel.active");
+    const focusTarget = activePanel?.querySelector("input, select, textarea, button");
+    focusTarget?.focus?.();
+    return;
+  }
+
+  const selected = getSelectedRowForCurrentView();
+  if (!selected) {
+    showMessage("Seleccione un registro", "Haga clic en una fila para editarla o borrarla.", "warning");
+    return;
+  }
+
+  const typeMap = { clients: "clients", equipment: "equipment", products: "products" };
+  const type = typeMap[selected.type];
+  if (!type) return;
+
+  if (action === "edit-client" || action === "edit-equipment" || action === "edit-product") {
+    if (type === "clients") openClientDialog(selected.id);
+    else if (type === "equipment") openEquipmentDialog(selected.id, { source: "equipment" });
+    else if (type === "products") openProductDialog(selected.id);
+    return;
+  }
+
+  if (action === "delete-client") {
+    await deleteClient(selected.id);
+    return;
+  }
+  if (action === "delete-equipment") {
+    await deleteEquipment(selected.id);
+    return;
+  }
+  if (action === "delete-product") {
+    await deleteProduct(selected.id);
+    return;
+  }
+  if (action === "client-history") {
+    applyServiceHistoryFilter("client", selected.id);
+    return;
+  }
+  if (action === "equipment-history") {
+    applyServiceHistoryFilter("equipment", selected.id);
+  }
 }
 
 function updateServiceTopActions() {
   const isServicesView = currentView() === "services";
-  els.quickAction?.classList.toggle("hidden", isServicesView);
   els.serviceToolbar?.classList.toggle("hidden", !isServicesView);
   if (!els.serviceToolbar) return;
 
@@ -784,32 +987,36 @@ function updateServiceTopActions() {
   const service = isServicesView && selectedVisible && state.selectedRow?.type === "services"
     ? getServiceRecord(state.selectedRow.id)
     : null;
-  const selectedActions = service ? actionMenuItems("services", service.id, service) : [];
-  const findAction = (action) => selectedActions.find((item) => item.action === action);
+  const hasService = Boolean(service);
+  const canFinish = hasService && ["Sin revisar", "Revision demorada"].includes(service.status);
+  const canDeliver = hasService && ["Revisado", "Retiro demorado"].includes(service.status);
+  const canCancel = hasService && service.status !== "Cancelado";
   const primaryActions = [
     { action: "new-service", label: "Nuevo servicio" },
-    findAction("edit"),
-    findAction("delete"),
-  ].filter(Boolean);
+    { action: "edit", label: "Editar", disabled: !hasService },
+    { action: "delete", label: "Eliminar", disabled: !hasService },
+  ];
   const statusActions = [
-    findAction("finish-service"),
-    findAction("deliver-service"),
-    findAction("cancel-service"),
-  ].filter(Boolean);
+    { action: "finish-service", label: "Finalizar", disabled: !canFinish },
+    { action: "deliver-service", label: "Entregar", disabled: !canDeliver },
+    { action: "cancel-service", label: "Cancelar", disabled: !canCancel },
+  ];
   const historyActions = [
-    findAction("client-history"),
-    findAction("equipment-history"),
-  ].filter(Boolean);
+    { action: "client-history", label: "Historial cliente", disabled: !hasService },
+    { action: "equipment-history", label: "Historial equipo", disabled: !hasService },
+  ];
   const actions = [
     ...primaryActions,
-    ...(statusActions.length ? [{ separator: true }, ...statusActions] : []),
-    ...(historyActions.length ? [{ separator: true }, ...historyActions] : []),
+    { separator: true },
+    ...statusActions,
+    { separator: true },
+    ...historyActions,
   ];
 
   els.serviceToolbar.innerHTML = actions.map((item) => item.separator
     ? `<span class="service-toolbar-separator" aria-hidden="true"></span>`
     : `
-      <button class="service-toolbar-button service-toolbar-${escapeHtml(item.action)}" type="button" data-service-toolbar-action="${escapeHtml(item.action)}" data-tooltip="${escapeHtml(item.label)}" aria-label="${escapeHtml(item.label)}">
+      <button class="service-toolbar-button service-toolbar-${escapeHtml(item.action)}" type="button" data-service-toolbar-action="${escapeHtml(item.action)}" data-tooltip="${escapeHtml(item.label)}" aria-label="${escapeHtml(item.label)}"${item.disabled ? " disabled aria-disabled=\"true\"" : ""}>
         <img src="assets/icons/${escapeHtml(actionIconName(item.action, item.label))}" alt="">
       </button>
   `).join("");
@@ -833,7 +1040,7 @@ async function handleServiceStatusQuickAction(event) {
 
 async function handleServiceToolbarClick(event) {
   const button = event.target.closest?.("[data-service-toolbar-action]");
-  if (!button) return;
+  if (!button || button.disabled || button.getAttribute("aria-disabled") === "true") return;
   const action = button.dataset.serviceToolbarAction;
   if (action === "new-service") {
     openServiceDialog();
@@ -900,8 +1107,8 @@ async function initializeRemoteState() {
     state.csrfToken = session.csrfToken || "";
     state.dashboard = dashboard;
     state.clients = Array.isArray(remote.clients) ? remote.clients : [];
-    state.equipment = Array.isArray(remote.equipment) ? remote.equipment : [];
-    state.products = Array.isArray(remote.products) ? remote.products : [];
+    state.equipment = Array.isArray(remote.equipment) ? remote.equipment.map(normalizeEquipmentRecord) : [];
+    state.products = Array.isArray(remote.products) ? remote.products.map(normalizeProductRecord) : [];
     state.services = [];
     state.settings = normalizeSettings(remote.settings);
   } catch {
@@ -931,10 +1138,33 @@ function normalizeSettings(settings = {}) {
     margins: Array.isArray(settings.margins) ? settings.margins : [],
     frequentWorks: Array.isArray(settings.frequentWorks) ? settings.frequentWorks : [],
     technicians: Array.isArray(settings.technicians) ? settings.technicians : [],
-    serviceFilters: settings.serviceFilters || { all: true, statuses: [] },
+    serviceFilters: normalizeServiceFilters(settings.serviceFilters),
     serviceDelays: normalizeServiceDelays(settings.serviceDelays),
     serviceDelayReminders: normalizeServiceDelayReminders(settings.serviceDelayReminders),
   };
+}
+
+function normalizeServiceFilters(filters = {}) {
+  const statusMap = {
+    "Sin ver": "Sin revisar",
+    Finalizado: "Revisado",
+  };
+  const validStatuses = new Set([
+    "Sin revisar",
+    "Revision demorada",
+    "Revisado",
+    "Retiro demorado",
+    "Entregado",
+    "Cancelado",
+  ]);
+  const statuses = Array.isArray(filters.statuses)
+    ? filters.statuses
+        .map((status) => statusMap[status] || status)
+        .filter((status) => validStatuses.has(status))
+    : [];
+  return filters.all === false && statuses.length
+    ? { all: false, statuses: [...new Set(statuses)] }
+    : { all: true, statuses: [] };
 }
 
 function normalizeServiceDelays(delays = {}) {
@@ -978,10 +1208,7 @@ function loadEquipment() {
   const stored = localStorage.getItem(EQUIPMENT_STORAGE_KEY);
   if (stored) {
     try {
-      return JSON.parse(stored).map((item) => ({
-        ...item,
-        observations: item.observations || "",
-      }));
+      return JSON.parse(stored).map((item) => normalizeEquipmentRecord(item));
     } catch {
       localStorage.removeItem(EQUIPMENT_STORAGE_KEY);
     }
@@ -994,7 +1221,7 @@ function loadProducts() {
   const stored = localStorage.getItem(PRODUCTS_STORAGE_KEY);
   if (stored) {
     try {
-      return JSON.parse(stored);
+      return JSON.parse(stored).map((item) => normalizeProductRecord(item));
     } catch {
       localStorage.removeItem(PRODUCTS_STORAGE_KEY);
     }
@@ -1042,7 +1269,6 @@ function loadSettings() {
 
 function persistClients() {
   if (state.remoteEnabled) {
-    persistRemote("clients", state.clients);
     return;
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.clients));
@@ -1050,7 +1276,6 @@ function persistClients() {
 
 function persistEquipment() {
   if (state.remoteEnabled) {
-    persistRemote("equipment", state.equipment);
     return;
   }
   localStorage.setItem(EQUIPMENT_STORAGE_KEY, JSON.stringify(state.equipment));
@@ -1058,7 +1283,6 @@ function persistEquipment() {
 
 function persistProducts() {
   if (state.remoteEnabled) {
-    persistRemote("products", state.products);
     return;
   }
   localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(state.products));
@@ -1066,7 +1290,6 @@ function persistProducts() {
 
 function persistServices() {
   if (state.remoteEnabled) {
-    persistRemote("services", state.services);
     return;
   }
   localStorage.setItem(SERVICES_STORAGE_KEY, JSON.stringify(state.services));
@@ -1082,9 +1305,6 @@ function persistSettings() {
 
 function persistRemote(bucket, value) {
   clearRemotePage(bucket);
-  if (bucket !== "settings") {
-    state.dashboard = null;
-  }
   fetch(`/api/state/${bucket}`, {
     method: "PUT",
     credentials: "same-origin",
@@ -1098,6 +1318,45 @@ function persistRemote(bucket, value) {
     .catch(() => {
     showToast("No se pudo sincronizar con la nube", { type: "error" });
   });
+}
+
+function normalizeEquipmentRecord(item) {
+  if (!item || typeof item !== "object") return item;
+  return {
+    ...item,
+    clientId: Number(item.clientId ?? item.clienteId ?? item.client_id ?? 0) || 0,
+    type: String(item.type ?? item.tipo ?? item.deviceType ?? item.device_type ?? item.category ?? "").trim(),
+    brand: String(item.brand ?? item.marca ?? item.brandName ?? item.brand_name ?? "").trim(),
+    model: String(item.model ?? item.modelo ?? item.modelName ?? item.model_name ?? "").trim(),
+    serial: String(item.serial ?? item.nroSerie ?? item.nro_serie ?? item.serialNumber ?? item.serial_number ?? "").trim(),
+    condition: String(item.condition ?? item.estado ?? item.estadoFisico ?? item.state ?? item.stateText ?? "").trim(),
+    observations: String(item.observations ?? item.observacion ?? item.observaciones ?? "").trim(),
+    password: String(item.password ?? item.clave ?? item.pass ?? "").trim(),
+    pattern: String(item.pattern ?? item.patron ?? "").trim(),
+  };
+}
+
+function normalizeProductRecord(item) {
+  if (!item || typeof item !== "object") return item;
+  return {
+    ...item,
+    type: String(item.type ?? item.tipo ?? item.category ?? item.categoria ?? "").trim(),
+    brand: String(item.brand ?? item.marca ?? item.brandName ?? item.brand_name ?? "").trim(),
+    model: String(item.model ?? item.modelo ?? item.modelName ?? item.model_name ?? "").trim(),
+    provider: String(item.provider ?? item.proveedor ?? item.proovedor ?? item.supplier ?? "").trim(),
+    status: productStatusLabel(item.status ?? item.estado ?? item.state),
+    features: String(item.features ?? item.caracteristicas ?? item.characteristics ?? "").trim(),
+    cost: Number(item.cost ?? item.costo ?? 0) || 0,
+    margin: Number(item.margin ?? item.margen ?? 0) || 0,
+    warrantyAmount: Number(item.warrantyAmount ?? item.garantia ?? item.warranty ?? 0) || 0,
+    warrantyUnit: String(item.warrantyUnit ?? item.garantiaUnidad ?? item.unitWarranty ?? "months").trim() || "months",
+  };
+}
+
+function normalizeRecordForBucket(bucket, item) {
+  if (bucket === "equipment") return normalizeEquipmentRecord(item);
+  if (bucket === "products") return normalizeProductRecord(item);
+  return item;
 }
 
 function cleanPersistItem(item) {
@@ -1121,7 +1380,7 @@ function createRemoteItem(bucket, item) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "No se pudo sincronizar con la nube");
       await refreshDashboard();
-      return data.item;
+      return normalizeRecordForBucket(bucket, data.item);
     })
     .catch((error) => {
       showToast(error.message || "No se pudo sincronizar con la nube", { type: "error" });
@@ -1131,7 +1390,6 @@ function createRemoteItem(bucket, item) {
 
 function persistRemoteItem(bucket, item) {
   if (!item?.id) return Promise.resolve(false);
-  clearRemotePagesForItemChange(bucket);
   return fetch(`/api/item/${bucket}/${encodeURIComponent(item.id)}`, {
     method: "PUT",
     credentials: "same-origin",
@@ -1197,6 +1455,7 @@ function renderAll() {
   renderServices();
   renderSettings();
   renderActivity();
+  updateModuleToolbars();
   refreshServiceClientDatalist();
   refreshPartProductDatalist();
   refreshFrequentWorkDatalist();
@@ -1255,11 +1514,13 @@ function resetTablePage(type) {
 function clearRemotePage(type) {
   delete state.remotePages[type];
   delete state.remotePageRequests[type];
+  delete state.remotePageErrors[type];
 }
 
 function clearRemotePages() {
   state.remotePages = {};
   state.remotePageRequests = {};
+  state.remotePageErrors = {};
 }
 
 function mapById(items) {
@@ -1269,6 +1530,20 @@ function mapById(items) {
 function paginateItems(type, items) {
   const remotePage = getRemotePage(type);
   if (remotePage) return remotePage;
+
+  if (state.remoteEnabled && remotePageConfig(type)) {
+    const page = Math.max(Number(state.pages[type] || 1), 1);
+    return {
+      page,
+      totalPages: 1,
+      total: null,
+      start: 0,
+      end: 0,
+      items: [],
+      loading: true,
+      error: state.remotePageErrors[type] || "",
+    };
+  }
 
   const totalPages = Math.max(1, Math.ceil(items.length / TABLE_PAGE_SIZE));
   const page = Math.min(Math.max(Number(state.pages[type] || 1), 1), totalPages);
@@ -1299,6 +1574,7 @@ function getRemotePage(type) {
       start,
       end: Math.min(start + cached.items.length, cached.total),
       items: cached.items,
+      loading: false,
     };
   }
   requestRemotePage(type, config);
@@ -1359,9 +1635,13 @@ async function requestRemotePage(type, config) {
   try {
     const page = await fetchJson(config.url);
     if (state.remotePageRequests[type] !== config.key) return;
+    delete state.remotePageErrors[type];
+    const pageItems = Array.isArray(page.items)
+      ? page.items.map((item) => normalizeRecordForBucket(type, item))
+      : [];
     state.remotePages[type] = {
       key: config.key,
-      items: Array.isArray(page.items) ? page.items : [],
+      items: pageItems,
       page: Number(page.page || 1),
       pageSize: Number(page.pageSize || TABLE_PAGE_SIZE),
       total: Number(page.total || 0),
@@ -1369,8 +1649,11 @@ async function requestRemotePage(type, config) {
     };
     mergeStateItems(type, state.remotePages[type].items);
     renderPagedTable(type);
-  } catch {
-    clearRemotePage(type);
+  } catch (error) {
+    delete state.remotePages[type];
+    state.remotePageErrors[type] = error?.message || "No se pudo cargar la lista.";
+    showToast(state.remotePageErrors[type], { type: "error" });
+    renderPagedTable(type);
   } finally {
     if (state.remotePageRequests[type] === config.key) {
       delete state.remotePageRequests[type];
@@ -1385,7 +1668,7 @@ function mergeStateItems(type, items) {
   items.forEach((item) => {
     if (!item?.id) return;
     const id = Number(item.id);
-    byId.set(id, mergeCompleteRecord(byId.get(id), item));
+    byId.set(id, mergeCompleteRecord(byId.get(id), normalizeRecordForBucket(type, item)));
   });
   state[stateKey] = [...byId.values()];
 }
@@ -1422,6 +1705,7 @@ function getClientRecord(id) {
 
 function upsertStateItem(type, item) {
   if (!item?.id) return;
+  item = normalizeRecordForBucket(type, item);
   const stateKey = type === "equipment" ? "equipment" : type;
   const current = Array.isArray(state[stateKey]) ? state[stateKey] : [];
   const index = current.findIndex((entry) => Number(entry.id) === Number(item.id));
@@ -1429,10 +1713,9 @@ function upsertStateItem(type, item) {
   else current.push(item);
   state[stateKey] = current;
 
-  Object.values(state.remotePages).forEach((page) => {
-    const pageIndex = page.items?.findIndex((entry) => Number(entry.id) === Number(item.id));
-    if (pageIndex >= 0) page.items[pageIndex] = item;
-  });
+  const page = state.remotePages[type];
+  const pageIndex = page?.items?.findIndex((entry) => Number(entry.id) === Number(item.id));
+  if (pageIndex >= 0) page.items[pageIndex] = item;
 }
 
 function clearRemotePagesForItemChange(type) {
@@ -1444,7 +1727,6 @@ function clearRemotePagesForItemChange(type) {
   if (type === "equipment" || type === "products") {
     clearRemotePage("services");
   }
-  state.dashboard = null;
 }
 
 function removeStateItem(type, id) {
@@ -1452,18 +1734,17 @@ function removeStateItem(type, id) {
   if (Array.isArray(state[stateKey])) {
     state[stateKey] = state[stateKey].filter((item) => Number(item.id) !== Number(id));
   }
-  Object.values(state.remotePages).forEach((page) => {
-    if (Array.isArray(page.items)) {
-      page.items = page.items.filter((item) => Number(item.id) !== Number(id));
-    }
-  });
+  const page = state.remotePages[type];
+  if (Array.isArray(page?.items)) {
+    page.items = page.items.filter((item) => Number(item.id) !== Number(id));
+  }
 }
 
 function renderPagination(type, pageData) {
   const container = els.pagination[type];
   if (!container) return;
 
-  if (pageData.total <= TABLE_PAGE_SIZE) {
+  if (pageData.loading || pageData.total === null || pageData.total <= TABLE_PAGE_SIZE) {
     container.classList.add("hidden");
     container.innerHTML = "";
     return;
@@ -1648,16 +1929,24 @@ function setupRichTooltips() {
 }
 
 function getTooltipTarget(event) {
-  const target = event.target.closest?.("[data-tooltip]");
+  const node = event.target instanceof Element
+    ? event.target
+    : event.target?.parentElement || null;
+  const target = node?.closest?.("[data-tooltip]");
   if (!target || !target.dataset.tooltip) return null;
   if (target.classList.contains("linked-cell")) {
-    const interactiveText = event.target.closest("strong, .device-label");
+    const interactiveText = node?.closest?.("strong, .device-label");
     return interactiveText && target.contains(interactiveText) ? target : null;
   }
   return target;
 }
 
 function showRichTooltip(tooltip, target) {
+  const tooltipHost = target.closest?.("dialog[open]") || document.body;
+  if (tooltip.parentElement !== tooltipHost) {
+    tooltipHost.appendChild(tooltip);
+  }
+  tooltip.classList.remove("compact", "above");
   const lines = String(target.dataset.tooltip || "")
     .split("\n")
     .map((line) => line.trim())
@@ -1675,8 +1964,18 @@ function showRichTooltip(tooltip, target) {
   const footer = target.classList.contains("linked-cell")
     ? `<div class="app-tooltip-footer"><span>i</span> Click para editar</div>`
     : "";
+  if (target.classList.contains("service-work-tooltip-cell")) {
+    tooltip.innerHTML = `
+      <div class="app-tooltip-body app-tooltip-work-body">
+        <div class="app-tooltip-row app-tooltip-line">${escapeHtml(lines[0])}</div>
+        ${lines[1] ? `<div class="app-tooltip-row app-tooltip-line app-tooltip-strong-line">${escapeHtml(lines[1])}</div>` : ""}
+      </div>
+    `;
+    tooltip.classList.add("visible");
+    positionRichTooltip(tooltip, target);
+    return;
+  }
   tooltip.innerHTML = `
-    <div class="app-tooltip-title">Informacion</div>
     <div class="app-tooltip-body">
       ${lines.map((line) => tooltipLineHtml(line)).join("")}
     </div>
@@ -1969,7 +2268,7 @@ function renderServices() {
     els.servicesBody.appendChild(tr);
   });
 
-  els.emptyServices.classList.toggle("visible", pageData.total === 0);
+  els.emptyServices.classList.toggle("visible", !pageData.loading && !pageData.error && pageData.total === 0);
   renderPagination("services", pageData);
   updateServiceTopActions();
 }
@@ -2142,9 +2441,9 @@ async function executeActionMenuAction(action, record) {
     if (equipmentId) applyServiceHistoryFilter("equipment", equipmentId);
   } else if (action === "finish-service") {
     closeActionMenu();
-    openServiceDialog(record.id);
+    openServiceDialog(record.id, { forceExecution: true });
     els.serviceFields.status.value = "Revisado";
-    configureServiceTabs(false);
+    configureServiceTabs(false, { forceExecution: true });
     renderServiceWorks();
     showServiceTab("service-diagnosis-tab");
   } else if (action === "deliver-service") {
@@ -2371,6 +2670,7 @@ function selectRow(type, id, row) {
   document.querySelectorAll("tbody tr.selected-row").forEach((tr) => tr.classList.remove("selected-row"));
   row.classList.add("selected-row");
   state.selectedRow = { type, id };
+  updateModuleToolbars();
   updateServiceTopActions();
 }
 
@@ -2404,6 +2704,7 @@ function renderSettings() {
     els.settingsFields.pickupDelayAmount.value = serviceDelays.pickup.amount ? String(serviceDelays.pickup.amount) : "";
     els.settingsFields.pickupDelayUnit.value = serviceDelays.pickup.unit;
   }
+  refreshReplaceFieldOptions();
   const orphanCount = getOrphanClients().length;
   if (els.orphanClientsText) {
     els.orphanClientsText.textContent = orphanCount
@@ -2591,6 +2892,10 @@ function addTechnician() {
 async function runMassTextReplace() {
   const search = els.settingsFields.replaceSearch?.value.trim() || "";
   const replacement = els.settingsFields.replaceValue?.value || "";
+  const scopeKey = els.settingsFields.replaceScopeModule?.value || "all";
+  const fieldKey = els.settingsFields.replaceScopeField?.value || "";
+  const scope = TEXT_REPLACE_SCOPES[scopeKey] || TEXT_REPLACE_SCOPES.all;
+  const fieldLabel = fieldKey ? (TEXT_REPLACE_FIELDS[scopeKey] || []).find((item) => item.value === fieldKey)?.label || fieldKey : "Todos los campos";
   if (!search) {
     showToast("Indique el texto a buscar", { type: "error" });
     els.settingsFields.replaceSearch?.focus();
@@ -2598,8 +2903,8 @@ async function runMassTextReplace() {
   }
 
   const confirmed = await showMessage(
-    "Reemplazo masivo",
-    `Se reemplazara "${search}" por "${replacement}" en clientes, equipos, productos, services y configuracion.\n\nDesea continuar?`,
+    "Reemplazo exacto",
+    `Se reemplazara exactamente "${search}" por "${replacement}"\n\nModulo: ${scope.label}\nCampo: ${fieldLabel}\n\nDesea continuar?`,
     "warning",
     "confirm"
   );
@@ -2607,17 +2912,15 @@ async function runMassTextReplace() {
 
   if (!state.remoteEnabled) {
     const snapshot = snapshotData();
-    const buckets = ["clients", "equipment", "products", "services"];
+    const buckets = scope.buckets;
     let count = 0;
     buckets.forEach((bucket) => {
-      state[bucket] = replaceTextInObject(state[bucket], search, replacement, () => count += 1);
+      state[bucket] = replaceTextInObjectExact(state[bucket], search, replacement, () => count += 1, fieldKey);
     });
-    state.settings = replaceTextInObject(state.settings, search, replacement, () => count += 1);
     persistClients();
     persistEquipment();
     persistProducts();
     persistServices();
-    persistSettings();
     renderAll();
     showToast(`${count} cambio(s) realizados`, {
       actionLabel: "Deshacer",
@@ -2629,7 +2932,7 @@ async function runMassTextReplace() {
   try {
     const result = await fetchJson("/api/tools/replace-text", {
       method: "POST",
-      body: JSON.stringify({ search, replacement }),
+      body: JSON.stringify({ search, replacement, module: scopeKey, field: fieldKey }),
     });
     els.settingsFields.replaceSearch.value = "";
     els.settingsFields.replaceValue.value = "";
@@ -2642,104 +2945,37 @@ async function runMassTextReplace() {
   }
 }
 
-async function runMassValueMerge() {
-  const target = els.settingsFields.mergeTarget?.value.trim() || "";
-  const aliases = String(els.settingsFields.mergeValues?.value || "")
-    .split(/[|,;\n]/g)
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  if (!target || aliases.length === 0) {
-    showToast("Indique un valor canonico y al menos un equivalente", { type: "error" });
-    els.settingsFields.mergeTarget?.focus();
-    return;
-  }
-
-  const confirmed = await showMessage(
-    "Unificar valores",
-    `Se unificara todo lo que coincida con: ${aliases.join(", ")}\n\nValor canonico: ${target}\n\nDesea continuar?`,
-    "warning",
-    "confirm"
-  );
-  if (!confirmed) return;
-
-  if (!state.remoteEnabled) {
-    const snapshot = snapshotData();
-    const buckets = ["clients", "equipment", "products", "services"];
-    let count = 0;
-    buckets.forEach((bucket) => {
-      state[bucket] = mergeTextValuesInObject(state[bucket], target, aliases, () => count += 1);
-    });
-    state.settings = mergeTextValuesInObject(state.settings, target, aliases, () => count += 1);
-    persistClients();
-    persistEquipment();
-    persistProducts();
-    persistServices();
-    persistSettings();
-    renderAll();
-    els.settingsFields.mergeTarget.value = "";
-    els.settingsFields.mergeValues.value = "";
-    showToast(`${count} cambio(s) realizados`, {
-      actionLabel: "Deshacer",
-      onAction: () => restoreSnapshot(snapshot),
-    });
-    return;
-  }
-
-  try {
-    const result = await fetchJson("/api/tools/merge-values", {
-      method: "POST",
-      body: JSON.stringify({ target, aliases }),
-    });
-    els.settingsFields.mergeTarget.value = "";
-    els.settingsFields.mergeValues.value = "";
-    clearRemotePages();
-    await initializeRemoteState();
-    renderAll();
-    showToast(result.count ? `${result.count} cambio(s) realizados` : "No se encontraron coincidencias", {
-      actionLabel: result.undoId ? "Deshacer" : undefined,
-      onAction: result.undoId ? () => undoHistoryAction(result.undoId) : undefined,
-    });
-  } catch (error) {
-    showToast(error.message || "No se pudo unificar los valores", { type: "error" });
-  }
-}
-
-function replaceTextInObject(value, search, replacement, onChange) {
+function replaceTextInObjectExact(value, search, replacement, onChange, fieldKey = "", currentKey = "") {
   if (typeof value === "string") {
-    if (!value.includes(search)) return value;
+    if (fieldKey && currentKey !== fieldKey) return value;
+    if (value !== search) return value;
     onChange();
-    return value.split(search).join(replacement);
+    return replacement;
   }
   if (Array.isArray(value)) {
-    return value.map((item) => replaceTextInObject(item, search, replacement, onChange));
+    return value.map((item) => replaceTextInObjectExact(item, search, replacement, onChange, fieldKey, currentKey));
   }
   if (value && typeof value === "object") {
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, replaceTextInObject(item, search, replacement, onChange)])
+      Object.entries(value).map(([key, item]) => [
+        key,
+        replaceTextInObjectExact(item, search, replacement, onChange, fieldKey, key),
+      ])
     );
   }
   return value;
 }
 
-function mergeTextValuesInObject(value, canonical, aliases, onChange) {
-  const normalizedAliases = new Set(aliases.map((item) => normalizeSearch(item)).filter(Boolean));
-  const normalizedCanonical = normalizeSearch(canonical);
-  if (typeof value === "string") {
-    const normalized = normalizeSearch(value);
-    if (!normalized || !normalizedAliases.has(normalized) || normalized === normalizedCanonical) return value;
-    onChange();
-    return canonical;
-  }
-  if (Array.isArray(value)) {
-    return value.map((item) => mergeTextValuesInObject(item, canonical, aliases, onChange));
-  }
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, mergeTextValuesInObject(item, canonical, aliases, onChange)])
-    );
-  }
-  return value;
+function refreshReplaceFieldOptions() {
+  if (!els.settingsFields.replaceScopeModule || !els.settingsFields.replaceScopeField) return;
+  const scopeKey = els.settingsFields.replaceScopeModule.value || "all";
+  const options = TEXT_REPLACE_FIELDS[scopeKey] || TEXT_REPLACE_FIELDS.all;
+  const current = els.settingsFields.replaceScopeField.value;
+  els.settingsFields.replaceScopeField.innerHTML = options
+    .map((option) => `<option value="${escapeHtml(option.value)}">${escapeHtml(option.label)}</option>`)
+    .join("");
+  const nextValue = options.some((option) => option.value === current) ? current : (options[0]?.value || "");
+  els.settingsFields.replaceScopeField.value = nextValue;
 }
 
 function renderEquipment() {
@@ -2767,16 +3003,22 @@ function renderEquipment() {
   els.equipmentBody.innerHTML = "";
   pageData.items.forEach((equipment) => {
     const client = clientsById.get(Number(equipment.clientId)) || equipment._client;
+    const clientName = client?.name || "Sin cliente";
+    const brand = equipment.brand || "---";
+    const model = equipment.model || "---";
+    const serial = equipment.serial || "---";
+    const password = equipment.password || "No disponible";
+    const condition = equipment.condition || "---";
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(equipment.id)}</td>
-      <td><strong>${escapeHtml(client?.name || "Sin cliente")}</strong></td>
-      <td>${deviceLabelHtml(equipment, { text: equipment.type })}</td>
-      <td>${escapeHtml(equipment.brand)}</td>
-      <td>${escapeHtml(equipment.model)}</td>
-      <td>${escapeHtml(equipment.serial)}</td>
-      <td>${escapeHtml(equipment.password || "No disponible")}</td>
-      <td>${escapeHtml(equipment.condition)}</td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(clientName)}"><span class="cell-ellipsis"><strong>${escapeHtml(clientName)}</strong></span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(equipmentTooltip(equipment))}">${deviceLabelHtml(equipment, { text: equipment.type })}</td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(brand)}"><span class="cell-ellipsis">${escapeHtml(brand)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(model)}"><span class="cell-ellipsis">${escapeHtml(model)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(serial)}"><span class="cell-ellipsis">${escapeHtml(serial)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(password)}"><span class="cell-ellipsis">${escapeHtml(password)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(condition)}"><span class="cell-ellipsis">${escapeHtml(condition)}</span></td>
     `;
     markSelectedRow("equipment", equipment.id, tr);
     tr.addEventListener("click", () => {
@@ -2790,7 +3032,7 @@ function renderEquipment() {
     els.equipmentBody.appendChild(tr);
   });
 
-  els.emptyEquipment.classList.toggle("visible", pageData.total === 0);
+  els.emptyEquipment.classList.toggle("visible", !pageData.loading && !pageData.error && pageData.total === 0);
   renderPagination("equipment", pageData);
 }
 
@@ -2806,19 +3048,29 @@ function renderProducts() {
 
   els.productsBody.innerHTML = "";
   pageData.items.forEach((product) => {
+    const type = product.type || "---";
+    const brand = product.brand || "---";
+    const model = product.model || "---";
+    const provider = product.provider || "---";
+    const status = productStatusLabel(product.status);
+    const warranty = productWarrantyLabel(product);
+    const features = product.features || "---";
+    const cost = money(product.cost);
+    const margin = `${Number(productMarginPercent(product) || 0)} %`;
+    const finalPrice = money(productFinalPrice(product));
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(product.id)}</td>
-      <td>${escapeHtml(product.type)}</td>
-      <td>${escapeHtml(product.brand)}</td>
-      <td>${escapeHtml(product.model)}</td>
-      <td>${escapeHtml(product.provider || "---")}</td>
-      <td>${escapeHtml(productStatusLabel(product.status))}</td>
-      <td>${escapeHtml(productWarrantyLabel(product))}</td>
-      <td>${escapeHtml(product.features)}</td>
-      <td>${money(product.cost)}</td>
-      <td>${Number(productMarginPercent(product) || 0)} %</td>
-      <td><strong>${money(productFinalPrice(product))}</strong></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(type)}"><span class="cell-ellipsis">${escapeHtml(type)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(brand)}"><span class="cell-ellipsis">${escapeHtml(brand)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(model)}"><span class="cell-ellipsis">${escapeHtml(model)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(provider)}"><span class="cell-ellipsis">${escapeHtml(provider)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(status)}"><span class="cell-ellipsis">${escapeHtml(status)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(warranty)}"><span class="cell-ellipsis">${escapeHtml(warranty)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(features)}"><span class="cell-ellipsis">${escapeHtml(features)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(cost)}"><span class="cell-ellipsis">${cost}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(margin)}"><span class="cell-ellipsis">${escapeHtml(margin)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(finalPrice)}"><span class="cell-ellipsis"><strong>${finalPrice}</strong></span></td>
     `;
     markSelectedRow("products", product.id, tr);
     tr.addEventListener("click", () => {
@@ -2832,7 +3084,7 @@ function renderProducts() {
     els.productsBody.appendChild(tr);
   });
 
-  els.emptyProducts.classList.toggle("visible", pageData.total === 0);
+  els.emptyProducts.classList.toggle("visible", !pageData.loading && !pageData.error && pageData.total === 0);
   renderPagination("products", pageData);
 }
 
@@ -2928,7 +3180,6 @@ async function saveProduct(event) {
     persistProducts();
   }
   state.selectedRow = { type: "products", id: savedId };
-  clearRemotePage("products");
   renderAll();
   showToast(state.editingProductId ? "Producto actualizado" : "Producto agregado");
   if (els.serviceDialog.open) {
@@ -3190,6 +3441,87 @@ function renderSuggestionMenu(menu, items, onPick) {
   else clearComboMenuActive(menu);
 }
 
+function renderSimpleComboMenu(menu, field, values, onPick, showAll = false) {
+  if (!menu || !field) return;
+  const query = normalizeSearch(field.value);
+  const matches = values
+    .filter((value) => showAll || !query || normalizeSearch(value).includes(query))
+    .map((value) => ({ title: value, value }));
+  renderSuggestionMenu(menu, matches, onPick);
+}
+
+function frequentWorkOptions() {
+  return uniqueValues(state.settings.frequentWorks.map((work) => work.description));
+}
+
+function hideFrequentWorkMenu() {
+  els.frequentWorkMenu?.classList.remove("visible");
+}
+
+function hideFrequentWorkMenuOnOutsideClick(event) {
+  if (isEventInsideCombo(event, els.serviceFields.workDescription, els.frequentWorkMenu)) return;
+  hideFrequentWorkMenu();
+}
+
+function refreshFrequentWorkMenu(showAll = false) {
+  if (!isFieldMenuActive(els.serviceFields.workDescription, els.frequentWorkMenu, showAll)) {
+    hideFrequentWorkMenu();
+    return;
+  }
+  renderSimpleComboMenu(els.frequentWorkMenu, els.serviceFields.workDescription, frequentWorkOptions(), (description) => {
+    els.serviceFields.workDescription.value = description;
+    fillFrequentWorkPrice();
+    hideFrequentWorkMenu();
+    els.serviceFields.workDescription.focus();
+  }, showAll);
+}
+
+function hideProvinceMenu() {
+  els.provinceMenu?.classList.remove("visible");
+}
+
+function hideCityMenu() {
+  els.cityMenu?.classList.remove("visible");
+}
+
+function hideProvinceMenuOnOutsideClick(event) {
+  if (!els.provinceMenu?.classList.contains("visible")) return;
+  if (isEventInsideCombo(event, els.fields.province, els.provinceMenu)) return;
+  hideProvinceMenu();
+}
+
+function hideCityMenuOnOutsideClick(event) {
+  if (!els.cityMenu?.classList.contains("visible")) return;
+  if (isEventInsideCombo(event, els.fields.city, els.cityMenu)) return;
+  hideCityMenu();
+}
+
+function refreshProvinceMenu(showAll = false) {
+  if (!isFieldMenuActive(els.fields.province, els.provinceMenu, showAll)) {
+    hideProvinceMenu();
+    return;
+  }
+  renderSimpleComboMenu(els.provinceMenu, els.fields.province, state.provinces, async (province) => {
+    els.fields.province.value = province;
+    els.fields.city.value = "";
+    hideProvinceMenu();
+    await loadCities(province);
+    els.fields.city.focus();
+    refreshCityMenu(true);
+  }, showAll);
+}
+
+function refreshCityMenu(showAll = false) {
+  if (!isFieldMenuActive(els.fields.city, els.cityMenu, showAll)) {
+    hideCityMenu();
+    return;
+  }
+  renderSimpleComboMenu(els.cityMenu, els.fields.city, state.cities, (city) => {
+    els.fields.city.value = city;
+    hideCityMenu();
+  }, showAll);
+}
+
 function productBrandOptions() {
   const type = els.productFields.type.value.trim();
   return [...new Set(
@@ -3330,16 +3662,25 @@ function renderClients() {
   els.tbody.innerHTML = "";
   pageData.items.forEach((pageClient) => {
     const client = getClientRecord(pageClient.id) || pageClient;
+    const name = client.name || "---";
+    const province = client.province || "---";
+    const city = client.city || "---";
+    const address = client.address || "---";
+    const phone1 = client.phone1 || "---";
+    const phone2 = client.phone2 || "---";
+    const clientDocument = client.document || "---";
+    const comments = client.comments || "---";
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${escapeHtml(client.id)}</td>
-      <td><strong>${escapeHtml(client.name)}</strong></td>
-      <td>${escapeHtml(client.province)}</td>
-      <td>${escapeHtml(client.city)}</td>
-      <td>${escapeHtml(client.phone1)}</td>
-      <td>${escapeHtml(client.phone2)}</td>
-      <td>${escapeHtml(client.document)}</td>
-      <td>${escapeHtml(client.comments)}</td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(name)}"><span class="cell-ellipsis"><strong>${escapeHtml(name)}</strong></span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(province)}"><span class="cell-ellipsis">${escapeHtml(province)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(city)}"><span class="cell-ellipsis">${escapeHtml(city)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(address)}"><span class="cell-ellipsis">${escapeHtml(address)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(phone1)}"><span class="cell-ellipsis">${escapeHtml(phone1)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(phone2)}"><span class="cell-ellipsis">${escapeHtml(phone2)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(clientDocument)}"><span class="cell-ellipsis">${escapeHtml(clientDocument)}</span></td>
+      <td class="tooltip-cell" data-tooltip="${escapeHtml(comments)}"><span class="cell-ellipsis">${escapeHtml(comments)}</span></td>
     `;
     markSelectedRow("clients", client.id, tr);
     tr.addEventListener("click", () => {
@@ -3353,7 +3694,7 @@ function renderClients() {
     els.tbody.appendChild(tr);
   });
 
-  els.empty.classList.toggle("visible", pageData.total === 0);
+  els.empty.classList.toggle("visible", !pageData.loading && !pageData.error && pageData.total === 0);
   renderPagination("clients", pageData);
 }
 
@@ -3686,15 +4027,13 @@ function openQuickEditPartDialog() {
 
 function addCurrentWorkToPreset() {
   const description = els.serviceFields.workDescription.value.trim();
-  const price = parseMoney(els.serviceFields.workPrice.value);
-  if (!description || !price) {
-    showMessage("Faltan datos", "Escriba un trabajo y su precio para guardarlo como predeterminado.", "warning");
+  if (!description) {
+    showMessage("Faltan datos", "Escriba un trabajo para guardarlo como predeterminado.", "warning");
     return;
   }
 
   const current = state.settings.frequentWorks.find((work) => work.description === description);
-  if (current) current.price = price;
-  else state.settings.frequentWorks.push({ description, price });
+  if (!current) state.settings.frequentWorks.push({ description, price: 0 });
 
   persistSettings();
   refreshFrequentWorkDatalist();
@@ -3764,6 +4103,7 @@ async function saveEquipment(event) {
     refreshServiceEquipmentSelect();
     els.serviceFields.equipment.value = String(savedId);
     syncServiceEquipmentPicker();
+    renderServiceQuickPresets();
   }
   closeEquipmentDialog();
 }
@@ -3843,13 +4183,7 @@ async function deleteEquipment(id) {
   showToast("Equipo eliminado", { actionLabel: "Deshacer", onAction: () => restoreSnapshot(snapshot) });
 }
 
-function openServiceDialog(id = null) {
-  if (state.clients.length === 0) {
-    showMessage("Faltan datos", "Primero debe cargar al menos un cliente.", "warning");
-    showView("clients");
-    return;
-  }
-
+function openServiceDialog(id = null, options = {}) {
   state.editingServiceId = id;
   state.serviceWorks = [];
   state.serviceParts = [];
@@ -3866,6 +4200,7 @@ function openServiceDialog(id = null) {
   if (service) {
     const client = getClientById(service.clientId);
     els.serviceFields.client.value = clientToOption(client);
+    syncServiceClientPicker();
     refreshServiceEquipmentSelect();
     els.serviceFields.equipment.value = String(service.equipmentId);
     syncServiceEquipmentPicker();
@@ -3878,13 +4213,15 @@ function openServiceDialog(id = null) {
     state.externalWorks = service.externalWorks ? structuredClone(service.externalWorks) : legacyExternalWorks(service);
   } else {
     els.serviceFields.status.value = "Sin revisar";
+    syncServiceClientPicker();
     refreshServiceEquipmentSelect();
   }
 
-  configureServiceTabs(!id);
-  showServiceTab("service-client-tab");
+  configureServiceTabs(!id, options);
+  showServiceTab(state.serviceDialogMode === "reception" ? "service-client-tab" : "service-diagnosis-tab");
   renderServiceIssues();
   renderRequestedWorks();
+  renderServiceQuickPresets();
   refreshTechnicianOptions();
   renderServiceWorks();
   renderServiceParts();
@@ -4065,26 +4402,41 @@ function showServiceTab(tabId) {
   els.serviceTabPanels.forEach((panel) => panel.classList.toggle("active", panel.id === tabId));
 }
 
-function configureServiceTabs(isNew) {
+function showSettingsTab(tabId) {
+  const targetId = tabId || els.settingsTabs.find((tab) => tab.classList.contains("active"))?.dataset.settingsTab || els.settingsTabPanels[0]?.id;
+  els.settingsTabs.forEach((tab) => {
+    const active = tab.dataset.settingsTab === targetId;
+    tab.classList.toggle("active", active);
+    tab.setAttribute("aria-selected", active ? "true" : "false");
+  });
+  els.settingsTabPanels.forEach((panel) => panel.classList.toggle("active", panel.id === targetId));
+}
+
+function configureServiceTabs(isNew, options = {}) {
   const status = els.serviceFields.status.value || "Sin revisar";
-  const allowExecutionTabs = !["Sin revisar", "Revision demorada"].includes(status) && !isNew;
+  const isReceptionStage = ["Sin revisar", "Revision demorada"].includes(status);
+  const executionMode = Boolean(options.forceExecution) || (!isNew && !isReceptionStage);
+  state.serviceDialogMode = executionMode ? "execution" : "reception";
+  els.serviceDialog?.classList.toggle("service-reception-mode", !executionMode);
+  els.serviceDialog?.classList.toggle("service-execution-mode", executionMode);
+  const allowExecutionTabs = executionMode;
   els.serviceTabs.forEach((tab) => {
     const tabId = tab.dataset.serviceTab;
-    const shouldHide = ["service-parts-tab", "service-summary-tab"].includes(tabId)
-      ? !allowExecutionTabs
+    const shouldHide = !allowExecutionTabs
+      ? ["service-parts-tab", "service-summary-tab"].includes(tabId)
       : false;
     tab.classList.toggle("hidden", shouldHide);
   });
-  updateServiceWorkMode(isNew);
+  updateServiceWorkMode(isNew, options);
 
   const activeHidden = els.serviceTabs.some((tab) => tab.classList.contains("active") && tab.classList.contains("hidden"));
-  if (isNew) showServiceTab("service-client-tab");
+  if (!allowExecutionTabs) showServiceTab("service-client-tab");
   else if (activeHidden) showServiceTab("service-diagnosis-tab");
 }
 
-function updateServiceWorkMode(isNew = !state.editingServiceId) {
+function updateServiceWorkMode(isNew = !state.editingServiceId, options = {}) {
   const status = els.serviceFields.status.value || "Sin revisar";
-  const executionMode = !isNew && !["Sin revisar", "Revision demorada"].includes(status);
+  const executionMode = Boolean(options.forceExecution) || (!isNew && !["Sin revisar", "Revision demorada"].includes(status));
   const issueEntryTarget = executionMode ? els.serviceExecutionIssueSlot : els.serviceIssueEntrySlot;
   const requestedWorkEntryTarget = executionMode ? els.serviceExecutionRequestedWorkSlot : els.requestedWorkEntrySlot;
   if (els.serviceIssueEntry && issueEntryTarget && els.serviceIssueEntry.parentElement !== issueEntryTarget) {
@@ -4106,7 +4458,7 @@ function updateServiceWorkMode(isNew = !state.editingServiceId) {
 
 function isServiceExecutionMode(isNew = !state.editingServiceId) {
   const status = els.serviceFields.status.value || "Sin revisar";
-  return !isNew && !["Sin revisar", "Revision demorada"].includes(status);
+  return state.serviceDialogMode === "execution" || (!isNew && !["Sin revisar", "Revision demorada"].includes(status));
 }
 
 function ensureIssueWorksForExecution() {
@@ -4145,11 +4497,46 @@ function addServiceIssue() {
     return;
   }
 
-  state.serviceIssues.push({ description, comment: "" });
+  addIssueDescription(description);
   els.serviceFields.issueDescription.value = "";
   els.serviceError.textContent = "";
   renderServiceIssues();
   renderServiceWorks();
+  renderServiceQuickPresets();
+}
+
+function addDetectedIssue() {
+  const field = els.serviceFields.detectedIssueDescription;
+  const description = field?.value.trim() || "";
+  if (!description) {
+    els.serviceError.textContent = "Escriba una falla detectada para agregarla a la lista.";
+    field?.focus();
+    return;
+  }
+
+  state.serviceWorks.push({
+    description,
+    price: 0,
+    done: false,
+    note: "",
+    technician: "",
+    source: "detectedIssue",
+  });
+  if (field) field.value = "";
+  els.serviceError.textContent = "";
+  renderServiceWorks();
+  refreshServiceSummary();
+}
+
+function addIssueDescription(description) {
+  const cleanDescription = String(description || "").trim();
+  if (!cleanDescription) return false;
+  const exists = state.serviceIssues.some((issue) =>
+    normalizeSearch(issue.description) === normalizeSearch(cleanDescription)
+  );
+  if (exists) return false;
+  state.serviceIssues.push({ description: cleanDescription, comment: "" });
+  return true;
 }
 
 function renderServiceIssues() {
@@ -4157,7 +4544,12 @@ function renderServiceIssues() {
   state.serviceIssues.forEach((issue, index) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${escapeHtml(issue.description)}</td>
+      <td>
+        <span class="reception-list-item" title="${escapeHtml(issue.description)}" data-tooltip="${escapeHtml(issue.description)}">
+          <span class="reception-list-icon"><img src="assets/icons/falla-field.svg" alt=""></span>
+          <span class="text-ellipsis">${escapeHtml(issue.description)}</span>
+        </span>
+      </td>
       <td><button class="small-button delete" type="button" data-remove-issue="${index}">Quitar</button></td>
     `;
     els.serviceIssuesBody.appendChild(tr);
@@ -4174,6 +4566,7 @@ function renderServiceIssues() {
       }
       renderServiceIssues();
       renderServiceWorks();
+      renderServiceQuickPresets();
     });
   });
   decorateActionButtons(els.serviceIssuesBody);
@@ -4188,17 +4581,24 @@ function addRequestedServiceWork() {
     return;
   }
 
-  const exists = state.serviceWorks.some((work) =>
-    normalizeSearch(work.description) === normalizeSearch(description) && work.source === "requested"
-  );
-  if (!exists) {
-    state.serviceWorks.push({ description, price: 0, done: false, note: "", technician: "", source: "requested" });
-  }
+  addRequestedWorkDescription(description);
   els.serviceFields.requestedWorkDescription.value = "";
   els.serviceError.textContent = "";
   renderRequestedWorks();
   renderServiceWorks();
   refreshServiceTotal();
+  renderServiceQuickPresets();
+}
+
+function addRequestedWorkDescription(description) {
+  const cleanDescription = String(description || "").trim();
+  if (!cleanDescription) return false;
+  const exists = state.serviceWorks.some((work) =>
+    normalizeSearch(work.description) === normalizeSearch(cleanDescription) && work.source === "requested"
+  );
+  if (exists) return false;
+  state.serviceWorks.push({ description: cleanDescription, price: 0, done: false, note: "", technician: "", source: "requested" });
+  return true;
 }
 
 function requestedWorks() {
@@ -4212,7 +4612,12 @@ function renderRequestedWorks() {
   requestedWorks().forEach(({ work, index }) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${escapeHtml(work.description)}</td>
+      <td>
+        <span class="reception-list-item" title="${escapeHtml(work.description)}" data-tooltip="${escapeHtml(work.description)}">
+          <span class="reception-list-icon"><img src="assets/icons/trabajo-field.svg" alt=""></span>
+          <span class="text-ellipsis">${escapeHtml(work.description)}</span>
+        </span>
+      </td>
       <td><button class="small-button delete" type="button" data-remove-requested-work="${index}">Quitar</button></td>
     `;
     els.requestedWorksBody.appendChild(tr);
@@ -4224,6 +4629,7 @@ function renderRequestedWorks() {
       renderRequestedWorks();
       renderServiceWorks();
       refreshServiceTotal();
+      renderServiceQuickPresets();
     });
   });
   decorateActionButtons(els.requestedWorksBody);
@@ -4233,29 +4639,21 @@ function renderRequestedWorks() {
 
 function addServiceWork() {
   const description = els.serviceFields.workDescription.value.trim();
-  const price = parseMoney(els.serviceFields.workPrice.value);
-  const technician = els.serviceFields.workTechnician.value.trim();
-  if (!description || !price) {
-    els.serviceError.textContent = "Escriba un trabajo y su precio.";
+  if (!description) {
+    els.serviceError.textContent = "Escriba un trabajo para agregarlo a la lista.";
+    els.serviceFields.workDescription.focus();
     return;
   }
 
-  state.serviceWorks.push({ description, price, done: true, note: "", technician, source: "extra" });
-  const existingFrequent = state.settings.frequentWorks.find((work) => work.description === description);
-  if (!existingFrequent) {
-    state.settings.frequentWorks.push({ description, price });
-    persistSettings();
-    refreshFrequentWorkDatalist();
-  }
+  state.serviceWorks.push({ description, price: 0, done: false, note: "", technician: "", source: "extra" });
   els.serviceFields.workDescription.value = "";
-  els.serviceFields.workPrice.value = "";
-  els.serviceFields.workTechnician.value = "";
   els.serviceError.textContent = "";
   renderServiceWorks();
   refreshServiceTotal();
 }
 
 function fillFrequentWorkPrice() {
+  if (!els.serviceFields.workPrice) return;
   if (els.serviceFields.workPrice.value.trim()) return;
   const description = els.serviceFields.workDescription.value.trim();
   const work = state.settings.frequentWorks.find((item) => item.description === description);
@@ -4315,59 +4713,112 @@ async function addServicePart() {
 
 function renderServiceWorks() {
   ensureIssueWorksForExecution();
-  els.serviceWorksBody.innerHTML = "";
-  const sourceOrder = { issue: 1, requested: 2, extra: 3 };
-  state.serviceWorks
+  const sourceOrder = { issue: 1, detectedIssue: 1, requested: 2, extra: 3 };
+  const sortedWorks = state.serviceWorks
     .map((work, index) => ({ work, index }))
     .sort((a, b) => {
       const sourceDiff = (sourceOrder[a.work.source] || 9) - (sourceOrder[b.work.source] || 9);
       return sourceDiff || a.index - b.index;
-    })
-    .forEach(({ work, index }) => {
-    const source = work.source === "requested"
-      ? "Trabajo pedido por el cliente"
-      : work.source === "issue"
-        ? "Falla reportada"
-        : "Trabajo extra";
-    const isIssueWork = work.source === "issue";
+    });
+  const isIssueWork = (work) => work.source === "issue" || work.source === "detectedIssue";
+  const issueWorks = sortedWorks.filter(({ work }) => isIssueWork(work));
+  const taskWorks = sortedWorks.filter(({ work }) => !isIssueWork(work));
+
+  const sourceLabel = (work) => {
+    if (work.source === "requested") return "Trabajo pedido por el cliente";
+    if (work.source === "detectedIssue") return "Falla detectada por el tecnico";
+    if (work.source === "issue") return "Falla reportada";
+    return "Trabajo extra";
+  };
+  const sourceTooltipLabel = (work) => {
+    if (work.source === "requested") return "Pedido por el cliente";
+    if (work.source === "detectedIssue") return "Falla detectada por el tecnico";
+    if (work.source === "issue") return "Falla reportada";
+    return "Trabajo extra";
+  };
+  const workTooltip = (work) => [
+    work.description || "-",
+    sourceTooltipLabel(work),
+  ].join("\n");
+  const workInfoHtml = (work, isIssueWork) => {
     const typeIcon = isIssueWork ? "falla-field.svg" : "trabajo-field.svg";
     const typeIconAlt = isIssueWork ? "Falla" : "Trabajo";
+    return `
+      <span class="work-kind-cell">
+        <span class="work-kind-icon"><img src="assets/icons/${typeIcon}" alt="${typeIconAlt}"></span>
+        <span>
+          <strong>${escapeHtml(work.description)}</strong>
+          <span class="muted-line">${escapeHtml(sourceLabel(work))}</span>
+        </span>
+      </span>
+    `;
+  };
+  const stateToggleHtml = (work, index, isIssueWork) => {
     const stateText = work.done === false
       ? (isIssueWork ? "No solucionada" : "No realizado")
       : (isIssueWork ? "Solucionado" : "Realizado");
-    const technicianOptions = technicianSelectOptions(work.technician || "");
-    const technicianCell = isIssueWork
-      ? `<span class="not-applicable">---</span>`
-      : `<select data-work-technician="${index}">${technicianOptions}</select>`;
-    const priceCell = isIssueWork
-      ? `<span class="not-applicable">---</span>`
-      : `<input class="price-input" type="text" inputmode="numeric" data-work-price="${index}" value="${escapeHtml(String(work.price || ""))}" placeholder="$ 0" ${work.done === false ? "disabled" : ""}>`;
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>
-        <span class="work-kind-cell">
-          <span class="embedded-combo-icon work-kind-icon"><img src="assets/icons/${typeIcon}" alt="${typeIconAlt}"></span>
-          <span>
-            <strong>${escapeHtml(work.description)}</strong>
-            <span class="muted-line">${source}</span>
-          </span>
-        </span>
-      </td>
-      <td>
-        <label class="work-state-toggle ${work.done === false ? "pending" : "done"}">
-          <input type="checkbox" data-work-done="${index}" ${work.done === false ? "" : "checked"}>
-          <span>${stateText}</span>
-        </label>
-      </td>
-      <td><textarea data-work-note="${index}" placeholder="${work.done === false ? "Motivo" : "Comentario"}">${escapeHtml(work.note || "")}</textarea></td>
-      <td>${technicianCell}</td>
-      <td>${priceCell}</td>
-      <td><button class="small-button delete" type="button" data-remove-work="${index}">Quitar</button></td>
+    return `
+      <label class="work-state-toggle ${work.done === false ? "pending" : "done"}">
+        <input type="checkbox" data-work-done="${index}" ${work.done === false ? "" : "checked"}>
+        <span>${stateText}</span>
+      </label>
     `;
-    els.serviceWorksBody.appendChild(tr);
-    tr.classList.toggle("work-done", work.done !== false);
-    tr.classList.toggle("work-pending", work.done === false);
-  });
+  };
+
+  const issueRows = issueWorks.map(({ work, index }) => `
+    <tr class="service-work-row issue-work-row ${work.done === false ? "work-pending" : "work-done"}">
+      <td class="tooltip-cell service-work-tooltip-cell" data-tooltip="${escapeHtml(workTooltip(work))}">${workInfoHtml(work, true)}</td>
+      <td>${stateToggleHtml(work, index, true)}</td>
+      <td><textarea data-work-note="${index}" placeholder="${work.done === false ? "Motivo" : "Comentario"}">${escapeHtml(work.note || "")}</textarea></td>
+      <td><button class="small-button delete" type="button" data-remove-work="${index}">Quitar</button></td>
+    </tr>
+  `).join("");
+
+  const taskRows = taskWorks.map(({ work, index }) => {
+    const technicianOptions = technicianSelectOptions(work.technician || "");
+    return `
+    <tr class="service-work-row task-work-row ${work.done === false ? "work-pending" : "work-done"}">
+      <td class="tooltip-cell service-work-tooltip-cell" data-tooltip="${escapeHtml(workTooltip(work))}">${workInfoHtml(work, false)}</td>
+      <td>${stateToggleHtml(work, index, false)}</td>
+      <td><textarea data-work-note="${index}" placeholder="${work.done === false ? "Motivo" : "Comentario"}">${escapeHtml(work.note || "")}</textarea></td>
+      <td><select data-work-technician="${index}">${technicianOptions}</select></td>
+      <td><input class="price-input" type="text" inputmode="numeric" data-work-price="${index}" value="${escapeHtml(String(work.price || ""))}" placeholder="$ 0" ${work.done === false ? "disabled" : ""}></td>
+      <td><button class="small-button delete" type="button" data-remove-work="${index}">Quitar</button></td>
+    </tr>
+  `;
+  }).join("");
+
+  els.serviceWorksBody.innerHTML = `
+    ${issueRows ? `
+      <table class="mini-table service-works-table service-issue-table">
+        <thead>
+          <tr>
+            <th>Falla</th>
+            <th>Solucionado</th>
+            <th>Comentario / motivo</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${issueRows}</tbody>
+      </table>
+    ` : ""}
+    ${taskRows ? `
+      <table class="mini-table service-works-table service-task-table">
+        <thead>
+          <tr>
+            <th>Trabajo</th>
+            <th>Hecho</th>
+            <th>Comentario / motivo</th>
+            <th>Tecnico</th>
+            <th>Precio</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>${taskRows}</tbody>
+      </table>
+    ` : ""}
+  `;
+  els.serviceWorksBody.classList.toggle("hidden", !issueRows && !taskRows);
 
   els.serviceWorksBody.querySelectorAll("[data-work-done]").forEach((checkbox) => {
     checkbox.addEventListener("change", () => {
@@ -4424,13 +4875,91 @@ function renderServiceWorks() {
     });
   });
   decorateActionButtons(els.serviceWorksBody);
-  toggleTableVisibility(els.serviceWorksBody);
   updateServiceWorkMode();
   refreshServiceSummary();
 }
 
-function technicianSelectOptions(selected = "") {
-  const options = [`<option value="">Sin asignar</option>`];
+function handleQuickPresetClick(event, type) {
+  const button = event.target.closest?.("[data-service-preset]");
+  if (!button) return;
+  const description = button.dataset.servicePreset || "";
+  const added = type === "issue"
+    ? addIssueDescription(description)
+    : addRequestedWorkDescription(description);
+  if (!added) return;
+  els.serviceError.textContent = "";
+  renderServiceIssues();
+  renderRequestedWorks();
+  renderServiceWorks();
+  refreshServiceTotal();
+  renderServiceQuickPresets();
+}
+
+function renderServiceQuickPresets() {
+  renderQuickPresetStrip(
+    els.issueQuickPresets,
+    serviceIssuePresetOptions(),
+    new Set(state.serviceIssues.map((issue) => normalizeSearch(issue.description)))
+  );
+  renderQuickPresetStrip(
+    els.requestedWorkQuickPresets,
+    serviceRequestedWorkPresetOptions(),
+    new Set(requestedWorks().map(({ work }) => normalizeSearch(work.description)))
+  );
+}
+
+function renderQuickPresetStrip(container, options, usedKeys) {
+  if (!container) return;
+  const available = options
+    .filter((option) => option && !usedKeys.has(normalizeSearch(option)))
+    .slice(0, 6);
+  container.innerHTML = available
+    .map((option) => `<button class="quick-preset-chip" type="button" data-service-preset="${escapeHtml(option)}">${escapeHtml(option)}</button>`)
+    .join("");
+  container.classList.toggle("hidden", available.length === 0);
+}
+
+function serviceIssuePresetOptions() {
+  return topServiceTextsForSelectedEquipment((service) => {
+    const issues = Array.isArray(service.issues) ? service.issues : legacyIssuesFromFailure(service.failure);
+    return issues.map((issue) => issue.description);
+  });
+}
+
+function serviceRequestedWorkPresetOptions() {
+  return topServiceTextsForSelectedEquipment((service) =>
+    normalizeServiceWorks(service.works || [])
+      .filter((work) => work.source === "requested")
+      .map((work) => work.description)
+  );
+}
+
+function topServiceTextsForSelectedEquipment(extractor) {
+  const selectedEquipment = getEquipmentById(els.serviceFields.equipment.value);
+  const selectedType = normalizeSearch(selectedEquipment?.type);
+  if (!selectedType) return [];
+
+  const counts = new Map();
+  const labels = new Map();
+  const add = (text, score = 1) => {
+    const label = String(text || "").trim();
+    const key = normalizeSearch(label);
+    if (!label || !key) return;
+    labels.set(key, labels.get(key) || label);
+    counts.set(key, (counts.get(key) || 0) + score);
+  };
+  state.services.forEach((service) => {
+    const serviceEquipment = getEquipmentById(service.equipmentId) || service._equipment;
+    if (normalizeSearch(serviceEquipment?.type) !== selectedType) return;
+    extractor(service).forEach((item) => add(item, 1));
+  });
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || labels.get(a[0]).localeCompare(labels.get(b[0])))
+    .map(([key]) => labels.get(key));
+}
+
+function technicianSelectOptions(selected = "", emptyLabel = "Sin asignar") {
+  const options = [`<option value="">${escapeHtml(emptyLabel)}</option>`];
   const technicians = [...state.settings.technicians];
   if (selected && !technicians.includes(selected)) technicians.push(selected);
   technicians.forEach((technician) => {
@@ -4442,7 +4971,7 @@ function technicianSelectOptions(selected = "") {
 function refreshTechnicianOptions() {
   if (!els.serviceFields?.workTechnician) return;
   const current = els.serviceFields.workTechnician.value;
-  els.serviceFields.workTechnician.innerHTML = technicianSelectOptions(current);
+  els.serviceFields.workTechnician.innerHTML = technicianSelectOptions(current, "Tecnico asignado");
 }
 
 function renderServiceParts() {
@@ -4498,7 +5027,9 @@ function refreshServiceTotal() {
 function refreshServiceSummary() {
   if (!els.serviceSummaryBody) return;
   els.serviceSummaryBody.innerHTML = "";
-  state.serviceWorks.forEach((work) => {
+  state.serviceWorks
+    .filter((work) => work.source !== "issue" && work.source !== "detectedIssue")
+    .forEach((work) => {
     const source = work.source === "requested" ? "pedido por cliente" : "extra";
     const technician = work.technician ? ` - ${work.technician}` : "";
     const note = work.note ? ` - ${work.note}` : "";
@@ -4545,6 +5076,7 @@ function refreshServiceClientMenu(showAll = false) {
   if (!els.serviceClientMenu) return;
   if (!isFieldMenuActive(els.serviceFields.client, els.serviceClientMenu, showAll)) {
     hideServiceClientMenu();
+    syncServiceClientPicker();
     return;
   }
   const query = normalizeSearch(els.serviceFields.client.value);
@@ -4572,9 +5104,12 @@ function refreshServiceClientMenu(showAll = false) {
       if (!client) return;
       els.serviceFields.client.value = clientToOption(client);
       hideServiceClientMenu();
+      syncServiceClientPicker();
       refreshServiceEquipmentSelect();
+      renderServiceQuickPresets();
     });
   });
+  syncServiceClientPicker();
 }
 
 function clientMenuButtonHtml(client, dataName = "client-option") {
@@ -4589,6 +5124,12 @@ function clientMenuButtonHtml(client, dataName = "client-option") {
 
 function hideServiceClientMenu() {
   els.serviceClientMenu?.classList.remove("visible");
+}
+
+function syncServiceClientPicker() {
+  if (!els.quickEditClient) return;
+  const clientId = optionToClientId(els.serviceFields.client.value);
+  els.quickEditClient.disabled = !clientId;
 }
 
 function hideServiceClientMenuOnOutsideClick(event) {
@@ -4634,6 +5175,7 @@ function renderServiceEquipmentPicker(equipment) {
       els.serviceFields.equipment.value = button.dataset.serviceEquipment;
       syncServiceEquipmentPicker();
       hideServiceEquipmentMenu();
+      renderServiceQuickPresets();
     });
   });
   syncServiceEquipmentPicker();
@@ -4713,10 +5255,6 @@ function refreshFrequentWorkDatalist() {
 
 function toggleTableVisibility(tbody) {
   const table = tbody.closest("table");
-  if (table?.classList.contains("keep-empty")) {
-    table.classList.remove("hidden");
-    return;
-  }
   if (table) table.classList.toggle("hidden", tbody.children.length === 0);
 }
 
@@ -5107,8 +5645,8 @@ function renderPatternSummary() {
 
 function openPatternDialog() {
   state.patternBeforeDialog = [...state.pattern];
-  renderPattern();
   if (!els.patternDialog?.open) els.patternDialog?.showModal();
+  requestAnimationFrame(() => renderPattern());
 }
 
 function acceptPatternDialog(event) {
@@ -5342,8 +5880,11 @@ function serviceFailureItems(service) {
     prefix: "Falla",
   }));
   const workItems = (service.works || [])
-    .filter((work) => work.source === "requested")
-    .map((work) => ({ label: work.description, prefix: "Trabajo" }));
+    .filter((work) => work.source === "requested" || work.source === "detectedIssue")
+    .map((work) => ({
+      label: work.description,
+      prefix: work.source === "detectedIssue" ? "Falla" : "Trabajo",
+    }));
   return [...issueItems, ...workItems].filter((item) => item.label);
 }
 
@@ -5361,7 +5902,7 @@ function serviceFailureTooltip(service) {
 
 function serviceWorksItems(service) {
   return (service.works || [])
-    .filter((work) => work.description)
+    .filter((work) => work.description && work.source !== "issue" && work.source !== "detectedIssue")
     .map((work) => {
       const done = work.done === false ? "No realizado" : "Realizado";
       const technician = work.technician ? ` - Tecnico: ${work.technician}` : "";
@@ -5378,6 +5919,7 @@ function serviceWorksItems(service) {
 function serviceTechnicians(service) {
   const names = new Set();
   (service.works || []).forEach((work) => {
+    if (work.source === "issue" || work.source === "detectedIssue") return;
     if (work.technician) names.add(work.technician);
   });
   (service.externalWorks || legacyExternalWorks(service)).forEach((work) => {
@@ -5392,7 +5934,7 @@ function serviceTechniciansSummary(service) {
 
 function serviceTechniciansTooltip(service) {
   const workLines = (service.works || [])
-    .filter((work) => work.technician)
+    .filter((work) => work.technician && work.source !== "issue" && work.source !== "detectedIssue")
     .map((work) => `${work.technician}: ${work.description}`);
   const legacyLines = (service.externalWorks || legacyExternalWorks(service))
     .filter((work) => work.technician)
@@ -5452,7 +5994,7 @@ function servicePartsTooltip(service) {
 
 function serviceWorksTotal(service) {
   return (service.works || []).reduce((sum, work) =>
-    sum + (work.source === "issue" ? 0 : Number(work.price || 0)), 0);
+    sum + (work.source === "issue" || work.source === "detectedIssue" ? 0 : Number(work.price || 0)), 0);
 }
 
 function servicePartsTotal(service) {
@@ -5719,6 +6261,7 @@ async function loadProvinces() {
     const json = await response.json();
     state.provinces = json.provincias.map((province) => province.nombre).sort();
     fillDatalist(els.provinceList, state.provinces);
+    refreshProvinceMenu(false);
     state.offlineGeo = false;
   } catch {
     state.offlineGeo = true;
@@ -5741,6 +6284,7 @@ async function loadCities(province, selectedCity = "") {
     state.cities = [...new Set(json.localidades.map((city) => city.nombre))].sort();
     fillDatalist(els.cityList, state.cities);
     if (selectedCity) els.fields.city.value = selectedCity;
+    refreshCityMenu(false);
   } catch {
     state.offlineGeo = true;
   }

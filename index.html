@@ -56,15 +56,9 @@
           <button class="ghost-button" type="button" id="stop-impersonation">Volver al admin</button>
         </div>
         <header class="topbar">
-          <div>
+          <div class="topbar-title">
             <p class="eyebrow">Sistema web</p>
             <h1 id="view-title">Inicio</h1>
-          </div>
-          <div class="topbar-actions">
-            <button class="primary-action" type="button" id="quick-action">
-              <span>＋</span>
-              Nuevo cliente
-            </button>
           </div>
         </header>
 
@@ -136,11 +130,21 @@
         </section>
 
         <section class="view" id="clients-view">
-          <div class="toolbar">
-            <label class="search-field">
-              <span class="search-icon" aria-hidden="true"></span>
-              <input id="client-search" type="search" placeholder="Buscar por nombre, telefono, documento o localidad">
-            </label>
+          <div class="service-control-row module-control-row">
+            <section class="service-control-group">
+              <span class="service-control-label">Comandos</span>
+              <div class="service-toolbar" id="clients-toolbar" aria-label="Acciones de clientes"></div>
+            </section>
+
+            <section class="service-control-group service-filter-group">
+              <span class="service-control-label">Busqueda y filtros</span>
+              <div class="service-filter-box">
+                <label class="search-field service-inline-search">
+                  <span class="search-icon" aria-hidden="true"></span>
+                  <input id="client-search" type="search" placeholder="Buscar por nombre, telefono, documento o localidad">
+                </label>
+              </div>
+            </section>
           </div>
 
           <div class="table-wrap">
@@ -151,6 +155,7 @@
                   <th>Nombre</th>
                   <th>Provincia</th>
                   <th>Localidad</th>
+                  <th>Direccion</th>
                   <th>Telefono</th>
                   <th>Telefono 2</th>
                   <th>DNI/CUIT</th>
@@ -168,11 +173,21 @@
         </section>
 
         <section class="view" id="equipment-view">
-          <div class="toolbar">
-            <label class="search-field">
-              <span class="search-icon" aria-hidden="true"></span>
-              <input id="equipment-search" type="search" placeholder="Buscar por cliente, tipo, marca, modelo o serie">
-            </label>
+          <div class="service-control-row module-control-row">
+            <section class="service-control-group">
+              <span class="service-control-label">Comandos</span>
+              <div class="service-toolbar" id="equipment-toolbar" aria-label="Acciones de equipos"></div>
+            </section>
+
+            <section class="service-control-group service-filter-group">
+              <span class="service-control-label">Busqueda y filtros</span>
+              <div class="service-filter-box">
+                <label class="search-field service-inline-search">
+                  <span class="search-icon" aria-hidden="true"></span>
+                  <input id="equipment-search" type="search" placeholder="Buscar por cliente, tipo, marca, modelo o serie">
+                </label>
+              </div>
+            </section>
           </div>
 
           <div class="table-wrap">
@@ -200,11 +215,21 @@
         </section>
 
         <section class="view" id="products-view">
-          <div class="toolbar">
-            <label class="search-field">
-              <span class="search-icon" aria-hidden="true"></span>
-              <input id="product-search" type="search" placeholder="Buscar por tipo, marca, modelo o caracteristicas">
-            </label>
+          <div class="service-control-row module-control-row">
+            <section class="service-control-group">
+              <span class="service-control-label">Comandos</span>
+              <div class="service-toolbar" id="products-toolbar" aria-label="Acciones de productos"></div>
+            </section>
+
+            <section class="service-control-group service-filter-group">
+              <span class="service-control-label">Busqueda y filtros</span>
+              <div class="service-filter-box">
+                <label class="search-field service-inline-search">
+                  <span class="search-icon" aria-hidden="true"></span>
+                  <input id="product-search" type="search" placeholder="Buscar por tipo, marca, modelo o caracteristicas">
+                </label>
+              </div>
+            </section>
           </div>
 
           <div class="table-wrap">
@@ -305,11 +330,15 @@
         <div class="toast-stack" id="toast-stack" aria-live="polite" aria-atomic="true"></div>
 
         <section class="view" id="settings-view">
-          <div class="settings-grid">
-            <section class="settings-section">
-              <div class="settings-section-heading">
-                <span class="panel-kicker">Productos</span>
-              </div>
+          <div class="settings-shell">
+            <div class="settings-tabs" role="tablist" aria-label="Secciones de configuracion">
+              <button class="settings-tab active" id="settings-products-tab-btn" type="button" data-settings-tab="settings-products-tab" aria-controls="settings-products-tab" aria-selected="true">Productos</button>
+              <button class="settings-tab" id="settings-services-tab-btn" type="button" data-settings-tab="settings-services-tab" aria-controls="settings-services-tab" aria-selected="false">Servicios</button>
+              <button class="settings-tab" id="settings-clients-tab-btn" type="button" data-settings-tab="settings-clients-tab" aria-controls="settings-clients-tab" aria-selected="false">Clientes</button>
+              <button class="settings-tab" id="settings-tools-tab-btn" type="button" data-settings-tab="settings-tools-tab" aria-controls="settings-tools-tab" aria-selected="false">Herramientas</button>
+            </div>
+            <div class="settings-grid">
+              <section class="settings-section settings-tab-panel active" id="settings-products-tab" role="tabpanel" aria-labelledby="settings-products-tab-btn">
               <section class="panel">
                 <div class="panel-heading">
                   <h2>Costo de transporte</h2>
@@ -350,12 +379,9 @@
                   <tbody id="margins-body"></tbody>
                 </table>
               </section>
-            </section>
+              </section>
 
-            <section class="settings-section">
-              <div class="settings-section-heading">
-                <span class="panel-kicker">Servicios</span>
-              </div>
+              <section class="settings-section settings-tab-panel" id="settings-services-tab" role="tabpanel" aria-labelledby="settings-services-tab-btn">
               <section class="panel">
                 <div class="panel-heading">
                   <h2>Alertas por demora</h2>
@@ -433,12 +459,9 @@
                   <tbody id="technicians-body"></tbody>
                 </table>
               </section>
-            </section>
+              </section>
 
-            <section class="settings-section">
-              <div class="settings-section-heading">
-                <span class="panel-kicker">Clientes</span>
-              </div>
+              <section class="settings-section settings-tab-panel" id="settings-clients-tab" role="tabpanel" aria-labelledby="settings-clients-tab-btn">
               <section class="panel">
                 <div class="panel-heading">
                   <h2>Mantenimiento</h2>
@@ -451,46 +474,40 @@
                   <button class="danger-button" type="button" id="delete-orphan-clients">Eliminar</button>
                 </div>
               </section>
-            </section>
+              </section>
 
-            <section class="settings-section">
-              <div class="settings-section-heading">
-                <span class="panel-kicker">Herramientas</span>
-              </div>
+              <section class="settings-section settings-tab-panel" id="settings-tools-tab" role="tabpanel" aria-labelledby="settings-tools-tab-btn">
               <section class="panel">
                 <div class="panel-heading">
-                  <h2>Reemplazo masivo de texto</h2>
+                  <h2>Reemplazo exacto de texto</h2>
                 </div>
                 <div class="replace-tool">
                   <label>
-                    Buscar
-                    <input id="replace-search" autocomplete="off" placeholder="Ej. Repuesto Migrado">
+                    Buscar valor exacto
+                    <input id="replace-search" autocomplete="off" placeholder="Texto a reemplazar">
                   </label>
                   <label>
                     Reemplazar por
                     <input id="replace-value" autocomplete="off" placeholder="Nuevo texto">
                   </label>
-                  <button class="primary-action" type="button" id="run-replace-text">Reemplazar</button>
-                </div>
-              </section>
-
-              <section class="panel">
-                <div class="panel-heading">
-                  <h2>Unificar valores</h2>
-                </div>
-                <div class="merge-tool">
                   <label>
-                    Valor canonico
-                    <input id="merge-target" autocomplete="off" placeholder="Ej. Motorola">
+                    Modulo
+                    <select id="replace-scope-module">
+                      <option value="all">Todos los modulos</option>
+                      <option value="clients">Clientes</option>
+                      <option value="equipment">Equipos</option>
+                      <option value="products">Productos</option>
+                      <option value="services">Services</option>
+                    </select>
                   </label>
                   <label>
-                    Valores equivalentes
-                    <input id="merge-values" autocomplete="off" placeholder="Ej. MOTOROLA, motorola">
+                    Campo
+                    <select id="replace-scope-field"></select>
                   </label>
-                  <button class="primary-action" type="button" id="run-merge-values">Unificar</button>
+                  <button class="primary-action" type="button" id="run-replace-text">Reemplazar exacto</button>
                 </div>
               </section>
-            </section>
+            </div>
           </div>
         </section>
       </main>
@@ -514,13 +531,15 @@
           </label>
           <label>
             Provincia
-            <input id="client-province" name="province" list="province-list" autocomplete="off" required>
+            <input id="client-province" name="province" autocomplete="off" required>
             <datalist id="province-list"></datalist>
+            <div class="combo-menu" id="province-menu"></div>
           </label>
           <label>
             Localidad
-            <input id="client-city" name="city" list="city-list" autocomplete="off" required>
+            <input id="client-city" name="city" autocomplete="off" required>
             <datalist id="city-list"></datalist>
+            <div class="combo-menu" id="city-menu"></div>
           </label>
           <label>
             Direccion
@@ -753,6 +772,7 @@
                   </span>
                 </label>
               </div>
+              <div class="quick-preset-strip" id="issue-quick-presets" aria-label="Fallas sugeridas"></div>
             </div>
             <div class="service-entry-group" id="requested-work-group">
               <table class="mini-table keep-empty">
@@ -777,62 +797,53 @@
                   </span>
                 </label>
               </div>
+              <div class="quick-preset-strip" id="requested-work-quick-presets" aria-label="Trabajos sugeridos"></div>
             </div>
-            <div class="service-entry-group service-execution-group hidden" id="service-execution-group">
-              <table class="mini-table service-works-table">
-                <thead>
-                  <tr>
-                    <th>Falla / Trabajo</th>
-                    <th>Hecho / Solucionado</th>
-                    <th>Comentario / motivo</th>
-                    <th>Tecnico</th>
-                    <th>Precio</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody id="service-works-body"></tbody>
-              </table>
+<div class="service-entry-group service-execution-group hidden" id="service-execution-group">
+  <div id="service-works-body" class="service-works-lists"></div>
 
               <div class="service-entry-section">
-                <div class="service-entry-title">Fallas / Trabajos especificados por el cliente</div>
-                <div id="service-execution-requested-work-slot"></div>
-                <div id="service-execution-issue-slot"></div>
+                <div class="service-entry-title">Trabajos / Fallas reportadas por el cliente</div>
+                <div class="service-entry-duo">
+                  <div id="service-execution-requested-work-slot"></div>
+                  <div id="service-execution-issue-slot"></div>
+                </div>
               </div>
 
               <div class="service-entry-section">
-                <div class="service-entry-title">Trabajos extra</div>
-                <div class="work-entry extra-work-entry">
-                  <label>
-                    <span class="sr-only">Trabajos extra</span>
+                <div class="service-entry-title">Trabajos / Fallas detectados por el tecnico</div>
+                <div class="service-entry-duo">
+                  <label class="service-inline-entry">
+                    <span class="sr-only">Trabajo detectado por el tecnico</span>
                     <span class="embedded-combo extra-work-combo">
                       <span class="embedded-combo-icon">
                         <img src="assets/icons/trabajo-field.svg" alt="">
                       </span>
-                      <input id="work-description" list="frequent-work-list" autocomplete="off" placeholder="Introduzca los trabajos extra realizados">
+                      <input id="work-description" autocomplete="off" placeholder="Introduzca los trabajos detectados por el tecnico">
+                      <button class="combo-action" type="button" id="add-work" title="Agregar a la lista" aria-label="Agregar a la lista">
+                        <img src="assets/icons/nuevo.svg" alt="">
+                      </button>
                     </span>
+                    <div class="combo-menu" id="frequent-work-menu"></div>
                     <datalist id="frequent-work-list"></datalist>
                   </label>
-                  <label>
-                    <span class="sr-only">Precio</span>
-                    <input id="work-price" inputmode="numeric" autocomplete="off" placeholder="Precio">
+                  <label class="service-inline-entry">
+                    <span class="sr-only">Falla detectada por el tecnico</span>
+                    <span class="embedded-combo extra-work-combo">
+                      <span class="embedded-combo-icon">
+                        <img src="assets/icons/falla-field.svg" alt="">
+                      </span>
+                      <input id="detected-issue-description" autocomplete="off" placeholder="Introduzca las fallas detectadas por el tecnico">
+                      <button class="combo-action" type="button" id="add-detected-issue" title="Agregar a la lista" aria-label="Agregar a la lista">
+                        <img src="assets/icons/nuevo.svg" alt="">
+                      </button>
+                    </span>
                   </label>
-                  <label>
-                    <span class="sr-only">Tecnico</span>
-                    <select id="work-technician">
-                      <option value="">Sin asignar</option>
-                    </select>
-                  </label>
-                  <button class="ghost-button" type="button" id="add-work">Agregar a la lista</button>
-                  <button class="ghost-button preset-button" type="button" id="save-work-preset">Agregar a predeterminado</button>
                 </div>
-              </div>
-            </div>
-          </div>
-          <div class="form-grid service-diagnosis-grid">
-            <label class="span-2">
-              Diagnostico
-              <textarea id="service-diagnosis" name="diagnosis" rows="2"></textarea>
-            </label>
+    <button class="ghost-button preset-button" type="button" id="save-work-preset">Agregar a predeterminado</button>
+  </div>
+  <textarea id="service-diagnosis" class="hidden" aria-hidden="true" tabindex="-1"></textarea>
+</div>
           </div>
         </section>
 
