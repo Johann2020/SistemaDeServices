@@ -1300,7 +1300,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       serialNumber: budget.serialNumber || '',
       description: `Reparación presupuestada según ${budget.id}. ` + (budget.notes || ''),
       reportedProblem: budget.notes || '',
-      plannedWork: budget.items.map(i => `${i.name} (${i.type === 'repuesto' ? 'Repuesto' : 'Mano de obra'} x${i.quantity})`).join('\n'),
+      plannedWork: budget.items.filter(i => i.type === 'mano_obra').map(i => i.name).join('\n') || 'Según presupuesto ' + budget.id,
       priority,
       assignedTechnician,
       laborCost: labor,
