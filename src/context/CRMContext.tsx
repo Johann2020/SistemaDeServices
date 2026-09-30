@@ -941,19 +941,21 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     mode: 'only_services' | 'services_and_equipments' | 'all'
   ) => {
     if (mode === 'only_services') {
+      const resetData = {
+        partsUsed: [] as OrderPart[],
+        laborCost: 0,
+        totalCost: 0,
+        diagnosticNotes: '',
+        workPerformed: '',
+        status: 'Ingresado' as OrderStatus,
+        updatedAt: new Date().toISOString()
+      };
+      const clientOrders = orders.filter(o => o.clientId === clientId);
+      clientOrders.forEach(o => api.orders.update(o.id, resetData).catch(console.error));
       setOrders(prev =>
         prev.map(order => {
           if (order.clientId === clientId) {
-            return {
-              ...order,
-              partsUsed: [],
-              laborCost: 0,
-              totalCost: 0,
-              diagnosticNotes: '',
-              workPerformed: '',
-              status: 'Ingresado' as OrderStatus,
-              updatedAt: new Date().toISOString()
-            };
+            return { ...order, ...resetData };
           }
           return order;
         })
@@ -1296,12 +1298,16 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const spares = budget.items
       .filter(item => item.type === 'repuesto')
-      .map(item => ({
-        id: item.id || `pt-${Math.random().toString(36).substring(2, 9)}`,
-        name: item.name,
-        price: item.price,
-        quantity: item.quantity
-      }));
+      .map(item => {
+        const invMatch = inventory.find(p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase());
+        return {
+          id: invMatch?.id || item.id || `pt-${Math.random().toString(36).substring(2, 9)}`,
+          name: item.name,
+          price: item.price,
+          costPrice: invMatch?.costPrice ?? Math.round(item.price * 0.7),
+          quantity: item.quantity
+        };
+      });
 
     const labor = budget.items
       .filter(item => item.type === 'mano_obra')
@@ -1315,29 +1321,29 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let targetOrderId: string;
 
     if (existingOrder) {
-      // Update the existing order instead of creating a new one
+      // Update the existing order in a single state update to avoid race conditions
       const updatedParts = [...(existingOrder.partsUsed || [])];
       spares.forEach(sp => {
-        if (!updatedParts.some(p => p.name.trim().toLowerCase() === sp.name.trim().toLowerCase())) {
-          updatedParts.push({ id: sp.id, name: sp.name, price: sp.price, quantity: sp.quantity });
+        if (!updatedParts.some(p => p.id === sp.id || p.name.trim().toLowerCase() === sp.name.trim().toLowerCase())) {
+          updatedParts.push(sp);
         }
       });
-      const totalCost = (existingOrder.laborCost || 0) + labor + updatedParts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+      const newLaborCost = (existingOrder.laborCost || 0) + labor;
+      const totalCost = newLaborCost + updatedParts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
       const currentPlanned = existingOrder.plannedWork || '';
       const mergedPlanned = currentPlanned ? currentPlanned + '\n' + plannedWorkText : plannedWorkText;
 
-      updateOrderDetails(existingOrder.id, {
-        laborCost: (existingOrder.laborCost || 0) + labor,
+      const updates = {
+        partsUsed: updatedParts,
+        laborCost: newLaborCost,
+        totalCost,
         assignedTechnician: assignedTechnician || existingOrder.assignedTechnician,
         plannedWork: mergedPlanned,
-      });
+        updatedAt: new Date().toISOString(),
+      };
 
-      setOrders(prev => prev.map(o => {
-        if (o.id === existingOrder.id) {
-          return { ...o, partsUsed: updatedParts, totalCost, plannedWork: mergedPlanned, laborCost: (existingOrder.laborCost || 0) + labor };
-        }
-        return o;
-      }));
+      setOrders(prev => prev.map(o => o.id === existingOrder.id ? { ...o, ...updates } : o));
+      api.orders.update(existingOrder.id, updates).catch(console.error);
 
       targetOrderId = existingOrder.id;
     } else {
@@ -1380,7 +1386,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setInventory(prevInv => {
         const currentInv = [...prevInv];
         spares.forEach(sp => {
-          const invIdx = currentInv.findIndex(p => p.name.trim().toLowerCase() === sp.name.trim().toLowerCase());
+          const invIdx = currentInv.findIndex(p => p.id === sp.id || p.name.trim().toLowerCase() === sp.name.trim().toLowerCase());
           if (invIdx > -1) {
             currentInv[invIdx] = { ...currentInv[invIdx], stock: Math.max(0, currentInv[invIdx].stock - sp.quantity) };
           }

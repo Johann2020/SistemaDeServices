@@ -74,11 +74,14 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true });
 });
 
+// Health check (before auth, accessible without token)
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // --- Tenant-scoped API routes ---
 // Middleware: authenticate + inject tenant DB into req.db
 app.use('/api', authMiddleware, (req, res, next) => {
-  // Skip auth routes that were already handled above
-  if (req.path.startsWith('/auth/')) return next();
   try {
     req.db = getTenantDb(req.tenantId);
     next();
@@ -96,8 +99,11 @@ app.use('/api/budgets', require('./routes/budgets.cjs'));
 app.use('/api/users', require('./routes/users.cjs'));
 app.use('/api/settings', require('./routes/settings.cjs'));
 
-// Migration endpoint
+// Migration endpoint (admin only)
 app.post('/api/migrate', (req, res) => {
+  if (req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Solo administradores pueden migrar datos' });
+  }
   try {
     const db = req.db;
     const { clients, orders, inventory, technicians, budgets, users, settings } = req.body;
@@ -235,11 +241,6 @@ app.post('/api/migrate', (req, res) => {
     console.error('Migration error:', err.message);
     res.status(500).json({ error: 'Migration failed: ' + err.message });
   }
-});
-
-// Health check (no auth)
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // --- Serve frontend static files in production ---

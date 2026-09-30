@@ -13,8 +13,17 @@ function getBudgetWithItems(db, budgetId) {
 
 function getAllBudgetsWithItems(db) {
   const budgets = db.prepare('SELECT * FROM budgets').all();
+  if (budgets.length === 0) return budgets;
+
+  const allItems = db.prepare('SELECT * FROM budget_items').all();
+  const itemsMap = {};
+  for (const item of allItems) {
+    if (!itemsMap[item.budgetId]) itemsMap[item.budgetId] = [];
+    itemsMap[item.budgetId].push(item);
+  }
+
   for (const budget of budgets) {
-    budget.items = db.prepare('SELECT * FROM budget_items WHERE budgetId = ?').all(budget.id);
+    budget.items = itemsMap[budget.id] || [];
     budget.totalCost = budget.totalCost || 0;
   }
   return budgets;

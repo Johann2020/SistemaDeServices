@@ -17,9 +17,25 @@ function getOrderWithRelations(db, orderId) {
 
 function getAllOrdersWithRelations(db) {
   const orders = db.prepare('SELECT * FROM orders').all();
+  if (orders.length === 0) return orders;
+
+  const allParts = db.prepare('SELECT * FROM order_parts').all();
+  const allHistory = db.prepare('SELECT orderId, status, timestamp FROM order_status_history ORDER BY id').all();
+
+  const partsMap = {};
+  for (const p of allParts) {
+    if (!partsMap[p.orderId]) partsMap[p.orderId] = [];
+    partsMap[p.orderId].push(p);
+  }
+  const historyMap = {};
+  for (const h of allHistory) {
+    if (!historyMap[h.orderId]) historyMap[h.orderId] = [];
+    historyMap[h.orderId].push({ status: h.status, timestamp: h.timestamp });
+  }
+
   for (const order of orders) {
-    order.partsUsed = db.prepare('SELECT * FROM order_parts WHERE orderId = ?').all(order.id);
-    order.statusHistory = db.prepare('SELECT status, timestamp FROM order_status_history WHERE orderId = ? ORDER BY id').all(order.id);
+    order.partsUsed = partsMap[order.id] || [];
+    order.statusHistory = historyMap[order.id] || [];
     order.laborCost = order.laborCost || 0;
     order.totalCost = order.totalCost || 0;
     order.paymentStatus = order.paymentStatus || 'Pendiente';
