@@ -21,7 +21,6 @@ import {   UserPlus,
   CheckCircle2, 
   Trash2,
   Lock,
-  Sparkles,
   X
 } from 'lucide-react';
 
@@ -193,7 +192,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
       setDevicePassword('');
       setDevicePattern('');
     }
-  }, [selectedClient, orders]);
+  }, [selectedClient?.id]);
 
   // Trigger search on typing client filter
   const handleClientSearchChange = (val: string) => {

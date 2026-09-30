@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { Client, Order, SparePartInventoryItem, OrderStatus, OrderPriority, OrderPart, CRMStats, DelayConfig, Technician, Toast, Budget, BudgetItem, BudgetStatus, PaymentStatus } from '../types';
-import { DEVICE_TYPES } from '../data';
 import { api } from '../api';
 
 export interface ActionHistoryEntry {

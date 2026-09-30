@@ -2,6 +2,7 @@ const express = require('express');
 const cookieParser = require('cookie-parser');
 const path = require('path');
 const crypto = require('crypto');
+const rateLimit = require('express-rate-limit');
 const { authMiddleware, generateToken, exchangeGoogleCode, findOrCreateFromGoogle } = require('./auth.cjs');
 const { getTenantDb, insert } = require('./tenantDb.cjs');
 const { findAccountByEmail } = require('./masterDb.cjs');
@@ -9,8 +10,16 @@ const { findAccountByEmail } = require('./masterDb.cjs');
 const app = express();
 const PORT = process.env.PORT || 3002;
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Demasiados intentos de autenticación, intenta en 15 minutos' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 app.use(cookieParser());
-app.use(express.json({ limit: '50mb' }));
+app.use(express.json({ limit: '2mb' }));
 
 // --- Auth routes (no tenant DB needed) ---
 
@@ -20,7 +29,7 @@ app.get('/api/auth/config', (req, res) => {
 });
 
 // Google OAuth callback - exchange code for user info, create/find account, set JWT cookie
-app.post('/api/auth/google', async (req, res) => {
+app.post('/api/auth/google', authLimiter, async (req, res) => {
   try {
     const { code, redirectUri } = req.body;
     if (!code) return res.status(400).json({ error: 'Code is required' });
@@ -99,8 +108,8 @@ app.use('/api/budgets', require('./routes/budgets.cjs'));
 app.use('/api/users', require('./routes/users.cjs'));
 app.use('/api/settings', require('./routes/settings.cjs'));
 
-// Migration endpoint (admin only)
-app.post('/api/migrate', (req, res) => {
+// Migration endpoint (admin only, larger body limit)
+app.post('/api/migrate', express.json({ limit: '50mb' }), (req, res) => {
   if (req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Solo administradores pueden migrar datos' });
   }

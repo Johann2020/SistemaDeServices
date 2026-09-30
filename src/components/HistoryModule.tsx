@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCRM } from '../context/CRMContext';
-import { Clock, Undo2, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Clock, Undo2, CheckCircle2 } from 'lucide-react';
 
 export const HistoryModule: React.FC = () => {
   const { actionHistory, undoToPoint } = useCRM();

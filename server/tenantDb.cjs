@@ -143,6 +143,11 @@ const SCHEMA_SQL = `
     key TEXT PRIMARY KEY,
     value TEXT DEFAULT ''
   );
+
+  CREATE INDEX IF NOT EXISTS idx_orders_clientId ON orders(clientId);
+  CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+  CREATE INDEX IF NOT EXISTS idx_order_status_history_orderId ON order_status_history(orderId);
+  CREATE INDEX IF NOT EXISTS idx_budgets_clientId ON budgets(clientId);
 `;
 
 const dbCache = new Map();

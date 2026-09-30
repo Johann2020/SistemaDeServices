@@ -62,7 +62,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           type: 'ready_delay', 
           label: `Retiro demorado`, 
           days: diffDays,
-          color: 'bg-rose-105 text-rose-800 border-rose-200'
+          color: 'bg-rose-100 text-rose-800 border-rose-200'
         };
       }
     }

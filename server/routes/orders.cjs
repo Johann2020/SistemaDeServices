@@ -114,6 +114,7 @@ router.put('/:id', (req, res) => {
     const statusHistory = data.statusHistory;
     delete data.partsUsed;
     delete data.statusHistory;
+    if (!data.updatedAt) data.updatedAt = new Date().toISOString();
 
     const updateOrder = req.db.transaction(() => {
       if (Object.keys(data).filter(k => k !== 'id').length > 0) {
