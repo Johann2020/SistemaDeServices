@@ -1,0 +1,6 @@
+{
+  "name": "CRM Servicio Técnico",
+  "description": "Sistema de gestión para talleres de servicio técnico con Dashboard, Tablero Kanban de órdenes y registro de equipos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
