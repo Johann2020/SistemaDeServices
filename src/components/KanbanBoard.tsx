@@ -50,6 +50,7 @@ import {
   Share2,
   Check,
   Home,
+  FolderOpen,
 } from "lucide-react";
 import { DEVICE_TYPES } from "../data";
 
@@ -1383,6 +1384,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    openOrderDetails(order);
+                                  }}
+                                  className="text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 p-1 rounded transition"
+                                  title="Abrir ficha de trabajo"
+                                >
+                                  <FolderOpen className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     setDeletingOrderId(order.id);
                                   }}
                                   className="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-1 rounded transition"
@@ -1540,14 +1551,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                 </span>
                               </div>
 
-                              {/* Open full diagnostic sheet CTA button inside card */}
-                              <button
-                                onClick={() => openOrderDetails(order)}
-                                className="w-full mt-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold py-2 px-3 rounded-lg flex items-center justify-center space-x-1.5 transition cursor-pointer border border-indigo-200/50 shadow-2xs"
-                              >
-                                <Wrench className="h-3.5 w-3.5 text-indigo-600" />
-                                <span>Abrir Ficha de Trabajo</span>
-                              </button>
                             </div>
                           </div>
                         )}
