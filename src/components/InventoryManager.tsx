@@ -1336,7 +1336,7 @@ export const InventoryManager: React.FC = () => {
                       </div>
                     </td>
                     <td className="py-4 px-4 text-slate-500 font-medium italic">
-                      {item.compatibleDevices || "Ficha universal"}
+                      {item.compatibleDevices || "Sin especificar"}
                     </td>
                     <td className="py-4 px-4">
                       <div className="font-bold text-slate-700 text-xs">

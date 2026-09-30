@@ -1163,13 +1163,25 @@ export const BudgetModule: React.FC = () => {
               </button>
             </div>
 
-            <div className="space-y-2.5">
+            <div className="space-y-0">
+              {/* Table header - shown once */}
+              {formItems.length > 0 && (
+                <div className="hidden md:flex items-center gap-3 px-3 pb-2 border-b border-slate-200/60 mb-2">
+                  <span className="flex-1 text-[10px] font-bold text-slate-400 uppercase">Descripción del Repuesto / Trabajo</span>
+                  <span className="w-36 text-[10px] font-bold text-slate-400 uppercase">Tipo de Costo</span>
+                  <span className="w-32 text-[10px] font-bold text-slate-400 uppercase">Precio Unit. ($)</span>
+                  <span className="w-20 text-[10px] font-bold text-slate-400 uppercase">Cant.</span>
+                  <span className="w-28 text-[10px] font-bold text-slate-400 uppercase text-right pr-2">Subtotal</span>
+                  <span className="w-9"></span>
+                </div>
+              )}
+
               {formItems.map((item, idx) => (
-                <div key={idx} className="flex flex-col md:flex-row items-stretch md:items-center gap-3 bg-slate-50/50 p-3 rounded-xl border border-slate-100 relative">
-                  
+                <div key={idx} className="flex flex-col md:flex-row items-stretch md:items-center gap-3 hover:bg-slate-50/50 px-3 py-2 rounded-lg border-b border-slate-100/60 last:border-0 relative transition">
+
                   {/* Item Description & Search */}
-                  <div className="flex-1 space-y-1 relative">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase leading-none block">Descripción del Repuesto / Trabajo *</label>
+                  <div className="flex-1 relative">
+                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase leading-none block mb-1">Descripción *</label>
                     <input
                       type="text"
                       required
@@ -1210,7 +1222,7 @@ export const BudgetModule: React.FC = () => {
                             <span className="text-xs font-mono font-black text-indigo-700">${(part.finalPrice || part.price || 0).toLocaleString('es-AR')}</span>
                           </button>
                         ))}
-                        
+
                         <button
                           type="button"
                           onClick={() => handleOpenNewPartModal(idx, partQuery)}
@@ -1218,8 +1230,8 @@ export const BudgetModule: React.FC = () => {
                         >
                           <Plus className="h-4 w-4 shrink-0" />
                           <span>
-                            {partQuery.trim() 
-                              ? `¿No existe? Registrar "${partQuery}" en inventario` 
+                            {partQuery.trim()
+                              ? `¿No existe? Registrar "${partQuery}" en inventario`
                               : `+ Registrar nuevo repuesto en inventario`}
                           </span>
                         </button>
@@ -1228,8 +1240,8 @@ export const BudgetModule: React.FC = () => {
                   </div>
 
                   {/* Type select */}
-                  <div className="w-full md:w-36 space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase leading-none block">Tipo de Costo</label>
+                  <div className="w-full md:w-36">
+                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase leading-none block mb-1">Tipo</label>
                     <select
                       value={item.type}
                       onChange={(e) => handleItemLineChange(idx, 'type', e.target.value)}
@@ -1241,8 +1253,8 @@ export const BudgetModule: React.FC = () => {
                   </div>
 
                   {/* Unit price */}
-                  <div className="w-full md:w-32 space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase leading-none block">Precio unitario ($) *</label>
+                  <div className="w-full md:w-32">
+                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase leading-none block mb-1">Precio ($)</label>
                     <input
                       type="number"
                       required
@@ -1260,8 +1272,8 @@ export const BudgetModule: React.FC = () => {
                   </div>
 
                   {/* Quantity */}
-                  <div className="w-full md:w-20 space-y-1">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase leading-none block">Cant.</label>
+                  <div className="w-full md:w-20">
+                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase leading-none block mb-1">Cant.</label>
                     <input
                       type="number"
                       required
@@ -1273,9 +1285,9 @@ export const BudgetModule: React.FC = () => {
                   </div>
 
                   {/* Total Line price */}
-                  <div className="w-full md:w-28 space-y-1 text-right select-none pr-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase leading-none block">Subtotal</span>
-                    <span className="text-xs font-mono font-black text-slate-700 inline-block mt-2">
+                  <div className="w-full md:w-28 text-right select-none pr-2">
+                    <label className="md:hidden text-[10px] font-bold text-slate-400 uppercase leading-none block mb-1">Subtotal</label>
+                    <span className="text-xs font-mono font-black text-slate-700">
                       ${((item.price || 0) * (item.quantity || 1)).toLocaleString('es-AR')}
                     </span>
                   </div>
