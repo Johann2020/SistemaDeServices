@@ -818,15 +818,24 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
 
-    // Sync both inventory and order to API
-    const updatedPart = inventory.find(p => p.id === partId);
-    if (updatedPart) {
-      api.inventory.update(partId, { stock: updatedPart.stock - quantity }).catch(console.error);
-    }
-    // Order will be synced via the state update above triggering a full order update
+    // Sync to API using pre-update values (avoid stale closure)
+    api.inventory.update(partId, { stock: part.stock - quantity }).catch(console.error);
+
     const currentOrder = orders.find(o => o.id === orderId);
     if (currentOrder) {
-      api.orders.update(orderId, { partsUsed: currentOrder.partsUsed, totalCost: currentOrder.totalCost }).catch(console.error);
+      const existingIdx = currentOrder.partsUsed.findIndex(p => p.id === partId);
+      let newParts: OrderPart[] = [...currentOrder.partsUsed];
+      if (existingIdx > -1) {
+        newParts[existingIdx] = { ...newParts[existingIdx], quantity: newParts[existingIdx].quantity + quantity };
+      } else {
+        newParts.push({
+          id: partId, name: part.name, price: part.price,
+          costPrice: part.costPrice !== undefined ? part.costPrice : Math.round(part.price * 0.7),
+          quantity
+        });
+      }
+      const partsSum = newParts.reduce((s, p) => s + p.price * p.quantity, 0);
+      api.orders.update(orderId, { partsUsed: newParts, totalCost: (Number(currentOrder.laborCost) || 0) + partsSum }).catch(console.error);
     }
 
     return true;
@@ -863,10 +872,14 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
       })
     );
-    if (ordPart) {
-      const invItem = inventory.find(p => p.id === partId);
-      if (invItem) api.inventory.update(partId, { stock: invItem.stock + ordPart.quantity }).catch(console.error);
+    // Sync to API using pre-update values (avoid stale closure)
+    const invItem = inventory.find(p => p.id === partId);
+    if (invItem) {
+      api.inventory.update(partId, { stock: invItem.stock + ordPart.quantity }).catch(console.error);
     }
+    const updatedParts = order.partsUsed.filter(p => p.id !== partId);
+    const partsSum = updatedParts.reduce((s, p) => s + p.price * p.quantity, 0);
+    api.orders.update(orderId, { partsUsed: updatedParts, totalCost: (Number(order.laborCost) || 0) + partsSum }).catch(console.error);
   };
 
   const addInventoryItem = (itemData: Omit<SparePartInventoryItem, 'id'>) => {

@@ -2,7 +2,12 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const { findAccountByGoogleId, findAccountByEmail, createAccount } = require('./masterDb.cjs');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'crm-dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || (() => {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('JWT_SECRET must be set in production');
+  }
+  return 'crm-dev-secret-local-only';
+})();
 
 function generateToken(account) {
   return jwt.sign(
@@ -78,4 +83,4 @@ function findOrCreateFromGoogle(profile) {
   });
 }
 
-module.exports = { generateToken, verifyToken, authMiddleware, exchangeGoogleCode, findOrCreateFromGoogle, JWT_SECRET };
+module.exports = { generateToken, verifyToken, authMiddleware, exchangeGoogleCode, findOrCreateFromGoogle };

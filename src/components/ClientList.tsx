@@ -73,7 +73,7 @@ export const ClientList: React.FC<ClientListProps> = ({
   const handleStartEdit = (client: Client) => {
     setEditingClient(client);
     setName(client.name);
-    setDoc(client.documentId);
+    setDoc(client.documentId || '');
     setProvincia(client.provincia || '');
     setLocalidad(client.localidad || '');
     setAddress(client.address || '');
@@ -123,7 +123,7 @@ export const ClientList: React.FC<ClientListProps> = ({
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.phone && c.phone.includes(searchQuery)) ||
     (c.phone2 && c.phone2.includes(searchQuery)) ||
-    c.documentId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (c.documentId && c.documentId.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (c.provincia && c.provincia.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (c.localidad && c.localidad.toLowerCase().includes(searchQuery.toLowerCase()))
   );

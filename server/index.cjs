@@ -208,6 +208,19 @@ app.post('/api/migrate', (req, res) => {
         }
       }
 
+      if (Array.isArray(users)) {
+        for (const user of users) {
+          if (!user.id) user.id = crypto.randomUUID();
+          if (!user.createdAt) user.createdAt = new Date().toISOString();
+          insert(db, 'users', {
+            id: user.id, name: user.name || '', email: user.email || '',
+            password: user.password || '', role: user.role || 'reader',
+            tenantId: user.tenantId || '', status: user.status || 'pending',
+            authMethod: user.authMethod || 'credentials', createdAt: user.createdAt
+          });
+        }
+      }
+
       if (settings && typeof settings === 'object') {
         const upsert = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
         for (const [key, value] of Object.entries(settings)) {

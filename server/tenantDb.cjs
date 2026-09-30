@@ -184,20 +184,33 @@ function getById(db, table, id) {
   return db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
 }
 
+const VALID_COL = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+
+function sanitizeKeys(data) {
+  const clean = {};
+  for (const k of Object.keys(data)) {
+    if (VALID_COL.test(k)) clean[k] = data[k];
+  }
+  return clean;
+}
+
 function insert(db, table, data) {
-  const keys = Object.keys(data);
+  const safe = sanitizeKeys(data);
+  const keys = Object.keys(safe);
+  if (keys.length === 0) return;
   const placeholders = keys.map(() => '?').join(', ');
   const cols = keys.join(', ');
-  const values = keys.map(k => data[k] !== undefined && data[k] !== null ? data[k] : '');
+  const values = keys.map(k => safe[k] !== undefined && safe[k] !== null ? safe[k] : '');
   const stmt = db.prepare(`INSERT OR REPLACE INTO ${table} (${cols}) VALUES (${placeholders})`);
   return stmt.run(...values);
 }
 
 function update(db, table, id, data) {
-  const keys = Object.keys(data).filter(k => k !== 'id');
+  const safe = sanitizeKeys(data);
+  const keys = Object.keys(safe).filter(k => k !== 'id');
   if (keys.length === 0) return;
   const setClause = keys.map(k => `${k} = ?`).join(', ');
-  const values = keys.map(k => data[k] !== undefined && data[k] !== null ? data[k] : '');
+  const values = keys.map(k => safe[k] !== undefined && safe[k] !== null ? safe[k] : '');
   const stmt = db.prepare(`UPDATE ${table} SET ${setClause} WHERE id = ?`);
   return stmt.run(...values, id);
 }
