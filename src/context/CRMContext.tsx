@@ -1292,25 +1292,76 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .filter(item => item.type === 'mano_obra')
       .reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
-    const orderData = {
-      clientId: clientId || '',
-      deviceType: budget.deviceType || 'Notebook',
-      brand: budget.brand || '',
-      model: budget.model || '',
-      serialNumber: budget.serialNumber || '',
-      description: `Reparación presupuestada según ${budget.id}. ` + (budget.notes || ''),
-      reportedProblem: budget.notes || '',
-      plannedWork: budget.items.filter(i => i.type === 'mano_obra').map(i => i.name).join('\n') || 'Según presupuesto ' + budget.id,
-      priority,
-      assignedTechnician,
-      laborCost: labor,
-      estimatedDelivery: budget.validUntil || ''
-    };
+    const plannedWorkText = budget.items.filter(i => i.type === 'mano_obra').map(i => i.name).join('\n') || 'Según presupuesto ' + budget.id;
 
-    const newOrder = addOrder(orderData);
+    // Check if budget is linked to an existing order
+    const existingOrder = budget.orderId ? orders.find(o => o.id === budget.orderId) : null;
 
-    if (spares.length > 0 && newOrder) {
-      // Deduct stock for each spare by name
+    let targetOrderId: string;
+
+    if (existingOrder) {
+      // Update the existing order instead of creating a new one
+      const updatedParts = [...(existingOrder.partsUsed || [])];
+      spares.forEach(sp => {
+        if (!updatedParts.some(p => p.name.trim().toLowerCase() === sp.name.trim().toLowerCase())) {
+          updatedParts.push({ id: sp.id, name: sp.name, price: sp.price, quantity: sp.quantity });
+        }
+      });
+      const totalCost = (existingOrder.laborCost || 0) + labor + updatedParts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+      const currentPlanned = existingOrder.plannedWork || '';
+      const mergedPlanned = currentPlanned ? currentPlanned + '\n' + plannedWorkText : plannedWorkText;
+
+      updateOrderDetails(existingOrder.id, {
+        laborCost: (existingOrder.laborCost || 0) + labor,
+        assignedTechnician: assignedTechnician || existingOrder.assignedTechnician,
+        plannedWork: mergedPlanned,
+      });
+
+      setOrders(prev => prev.map(o => {
+        if (o.id === existingOrder.id) {
+          return { ...o, partsUsed: updatedParts, totalCost, plannedWork: mergedPlanned, laborCost: (existingOrder.laborCost || 0) + labor };
+        }
+        return o;
+      }));
+
+      targetOrderId = existingOrder.id;
+    } else {
+      // Create a new order
+      const orderData = {
+        clientId: clientId || '',
+        deviceType: budget.deviceType || 'Notebook',
+        brand: budget.brand || '',
+        model: budget.model || '',
+        serialNumber: budget.serialNumber || '',
+        description: `Reparación presupuestada según ${budget.id}. ` + (budget.notes || ''),
+        reportedProblem: budget.notes || '',
+        plannedWork: plannedWorkText,
+        priority,
+        assignedTechnician,
+        laborCost: labor,
+        estimatedDelivery: budget.validUntil || ''
+      };
+
+      const newOrder = addOrder(orderData);
+      targetOrderId = newOrder.id;
+
+      if (spares.length > 0) {
+        setOrders(prev => prev.map(o => {
+          if (o.id === newOrder.id) {
+            const updatedParts = [...(o.partsUsed || [])];
+            spares.forEach(sp => {
+              updatedParts.push({ id: sp.id, name: sp.name, price: sp.price, quantity: sp.quantity });
+            });
+            const totalCost = labor + updatedParts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
+            return { ...o, partsUsed: updatedParts, totalCost };
+          }
+          return o;
+        }));
+      }
+    }
+
+    // Deduct stock for spares
+    if (spares.length > 0) {
       setInventory(prevInv => {
         const currentInv = [...prevInv];
         spares.forEach(sp => {
@@ -1321,32 +1372,11 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
         return currentInv;
       });
-
-      setOrders(prev => prev.map(o => {
-        if (o.id === newOrder.id) {
-          const updatedParts = [...(o.partsUsed || [])];
-          spares.forEach(sp => {
-            updatedParts.push({
-              id: sp.id,
-              name: sp.name,
-              price: sp.price,
-              quantity: sp.quantity
-            });
-          });
-          const totalCost = labor + updatedParts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
-          return {
-            ...o,
-            partsUsed: updatedParts,
-            totalCost
-          };
-        }
-        return o;
-      }));
     }
 
-    setBudgets(prev => prev.map(b => b.id === budgetId ? { ...b, status: 'Aprobado', convertedToOrderId: newOrder.id } : b));
-    showToast(`Presupuesto convertido a Ticket ${newOrder.id}`, 'success');
-    return newOrder.id;
+    setBudgets(prev => prev.map(b => b.id === budgetId ? { ...b, status: 'Aprobado', convertedToOrderId: targetOrderId } : b));
+    showToast(`Presupuesto ${existingOrder ? 'vinculado al' : 'convertido a'} Ticket ${targetOrderId}`, 'success');
+    return targetOrderId;
   };
 
   return (
