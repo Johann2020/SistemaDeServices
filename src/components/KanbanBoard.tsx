@@ -545,6 +545,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       laborCost: Number(laborCostTemp),
       paymentStatus: finalPaymentStatus,
       amountPaid: finalAmountPaid,
+      plannedWork: editPlannedWork,
     });
 
     // Update local modal data
@@ -561,6 +562,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         totalCost: Number(laborCostTemp) + partsSum,
         paymentStatus: finalPaymentStatus,
         amountPaid: finalAmountPaid,
+        plannedWork: editPlannedWork,
       };
     });
 
