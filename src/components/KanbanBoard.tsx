@@ -1441,6 +1441,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    openOrderDetails(order);
+                                  }}
+                                  className="text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 p-1 rounded transition"
+                                  title="Abrir ficha de trabajo"
+                                >
+                                  <FolderOpen className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     setDeletingOrderId(order.id);
                                   }}
                                   className="text-slate-300 hover:text-rose-500 hover:bg-rose-50 p-1 rounded transition"
