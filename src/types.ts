@@ -58,7 +58,8 @@ export interface Order {
   plannedWork?: string; // Trabajos a realizar (Ingreso)
   devicePassword?: string; // Contraseña o PIN del dispositivo
   devicePattern?: string; // Patrón de desbloqueo (para Teléfono o Tablet)
-  diagnosticNotes?: string; // Technician findings
+  diagnosticNotes?: string; // Technician diagnosis
+  workPerformed?: string; // Work done by technician
   status: OrderStatus;
   priority: OrderPriority;
   assignedTechnician: string;

@@ -689,6 +689,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reportedProblem: orderData.reportedProblem || orderData.description,
       plannedWork: orderData.plannedWork || '',
       diagnosticNotes: '',
+      workPerformed: '',
       status: 'Ingresado',
       priority: orderData.priority,
       assignedTechnician: orderData.assignedTechnician,
@@ -936,6 +937,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               laborCost: 0,
               totalCost: 0,
               diagnosticNotes: '',
+              workPerformed: '',
               status: 'Ingresado' as OrderStatus,
               updatedAt: new Date().toISOString()
             };

@@ -31,6 +31,7 @@ const SCHEMA_SQL = `
     reportedProblem TEXT DEFAULT '',
     plannedWork TEXT DEFAULT '',
     diagnosticNotes TEXT DEFAULT '',
+    workPerformed TEXT DEFAULT '',
     devicePassword TEXT DEFAULT '',
     devicePattern TEXT DEFAULT '',
     priority TEXT DEFAULT 'Media',
@@ -166,6 +167,9 @@ function getTenantDb(tenantId) {
   }
   if (!columns.includes('amountPaid')) {
     db.exec("ALTER TABLE orders ADD COLUMN amountPaid REAL DEFAULT 0");
+  }
+  if (!columns.includes('workPerformed')) {
+    db.exec("ALTER TABLE orders ADD COLUMN workPerformed TEXT DEFAULT ''");
   }
 
   dbCache.set(tenantId, db);

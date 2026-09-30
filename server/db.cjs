@@ -41,6 +41,7 @@ db.exec(`
     reportedProblem TEXT DEFAULT '',
     plannedWork TEXT DEFAULT '',
     diagnosticNotes TEXT DEFAULT '',
+    workPerformed TEXT DEFAULT '',
     devicePassword TEXT DEFAULT '',
     devicePattern TEXT DEFAULT '',
     priority TEXT DEFAULT 'Media',
@@ -159,6 +160,9 @@ if (!columns.includes('paymentStatus')) {
 }
 if (!columns.includes('amountPaid')) {
   db.exec("ALTER TABLE orders ADD COLUMN amountPaid REAL DEFAULT 0");
+}
+if (!columns.includes('workPerformed')) {
+  db.exec("ALTER TABLE orders ADD COLUMN workPerformed TEXT DEFAULT ''");
 }
 
 // Helper functions

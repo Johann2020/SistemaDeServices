@@ -178,6 +178,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [selectedPartId, setSelectedPartId] = useState("");
   const [partQuantity, setPartQuantity] = useState(1);
   const [diagnosticsTemp, setDiagnosticsTemp] = useState("");
+  const [workPerformedTemp, setWorkPerformedTemp] = useState("");
   const [laborCostTemp, setLaborCostTemp] = useState(0);
   const [paymentStatusTemp, setPaymentStatusTemp] = useState<"Pendiente" | "Parcial" | "Pagado">("Pendiente");
   const [amountPaidTemp, setAmountPaidTemp] = useState(0);
@@ -260,8 +261,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         ? `\n*Repuestos vinculados:*\n` + order.partsUsed.map((p) => `• ${p.name} (x${p.quantity})`).join("\n")
         : "";
 
-    const trabajosRealizados = order.diagnosticNotes
-      ? `\n\n*Trabajos realizados:* ${order.diagnosticNotes}`
+    const trabajosRealizados = order.workPerformed
+      ? `\n\n*Trabajos realizados:* ${order.workPerformed}`
       : "";
 
     const infoManoObraListo = order.laborCost
@@ -283,6 +284,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       .replace(/{ticket}/g, order.id)
       .replace(/{problema}/g, order.reportedProblem || order.description || "Pendiente de diagnóstico")
       .replace(/{trabajos_realizados}/g, trabajosRealizados)
+      .replace(/{trabajo_realizado}/g, order.workPerformed || "")
       .replace(/{tecnico}/g, order.assignedTechnician || "Por asignar")
       .replace(/{presupuesto}/g, totalEst)
       .replace(/{mano_obra}/g, laborEst)
@@ -446,6 +448,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     setSelectedOrderForModal(orderToOpen);
     setSelectedOrderId(orderToOpen.id);
     setDiagnosticsTemp(order.diagnosticNotes || "");
+    setWorkPerformedTemp(order.workPerformed || "");
     setLaborCostTemp(order.laborCost);
     setPaymentStatusTemp(order.paymentStatus || "Pendiente");
     setAmountPaidTemp(order.amountPaid || 0);
@@ -542,6 +545,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
     updateOrderDetails(selectedOrderForModal.id, {
       diagnosticNotes: diagnosticsTemp,
+      workPerformed: workPerformedTemp,
       laborCost: Number(laborCostTemp),
       paymentStatus: finalPaymentStatus,
       amountPaid: finalAmountPaid,
@@ -558,6 +562,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       return {
         ...prev,
         diagnosticNotes: diagnosticsTemp,
+        workPerformed: workPerformedTemp,
         laborCost: Number(laborCostTemp),
         totalCost: Number(laborCostTemp) + partsSum,
         paymentStatus: finalPaymentStatus,
@@ -1656,7 +1661,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     let defaultType: "ingreso" | "diagnostico" | "listo" | "entregado" = "ingreso";
                     if (selectedOrderForModal.status === "Listo") defaultType = "listo";
                     else if (selectedOrderForModal.status === "Entregado") defaultType = "entregado";
-                    else if (selectedOrderForModal.diagnosticNotes || selectedOrderForModal.totalCost) {
+                    else if (selectedOrderForModal.diagnosticNotes || selectedOrderForModal.workPerformed || selectedOrderForModal.totalCost) {
                       defaultType = "diagnostico";
                     }
 
@@ -2036,7 +2041,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                           <span className="text-slate-400 block text-[10px] mb-0.5">
                             Problema Reportado (Ingreso):
                           </span>
-                          <p className="text-xs text-slate-600 font-medium leading-relaxed bg-slate-50 p-2 rounded border border-slate-100 whitespace-pre-wrap">
+                          <p className="text-xs text-slate-600 font-medium leading-relaxed p-2 whitespace-pre-wrap">
                             {selectedOrderForModal.reportedProblem ||
                               selectedOrderForModal.description}
                           </p>
@@ -2045,7 +2050,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                           <span className="text-slate-400 block text-[10px] mb-0.5">
                             Trabajos a Realizar (Ingreso):
                           </span>
-                          <p className="text-xs text-slate-600 font-medium leading-relaxed bg-indigo-50/10 p-2 rounded border border-indigo-100/20 whitespace-pre-wrap">
+                          <p className="text-xs text-slate-600 font-medium leading-relaxed p-2 whitespace-pre-wrap">
                             {selectedOrderForModal.plannedWork ||
                               "Sin registrar"}
                           </p>
@@ -2219,10 +2224,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   <div className="space-y-3 font-sans">
                     <div>
                       <label className="text-xs font-semibold text-slate-500 block mb-1">
-                        Notas de Diagnóstico y Trabajo Realizado:
+                        Diagnóstico:
                       </label>
                       <textarea
-                        rows={4}
+                        rows={3}
                         value={diagnosticsTemp}
                         onChange={(e) => {
                           setDiagnosticsTemp(e.target.value);
@@ -2235,7 +2240,30 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             node.style.height = `${node.scrollHeight}px`;
                           }
                         }}
-                        placeholder="Reporta aquí los condensadores cambiados, piezas dañadas o avances del servicio..."
+                        placeholder="Diagnóstico del equipo: estado de componentes, fallas detectadas..."
+                        className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white text-slate-800 overflow-hidden resize-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-slate-500 block mb-1">
+                        Trabajo Realizado:
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={workPerformedTemp}
+                        onChange={(e) => {
+                          setWorkPerformedTemp(e.target.value);
+                          e.target.style.height = "auto";
+                          e.target.style.height = `${e.target.scrollHeight}px`;
+                        }}
+                        ref={(node) => {
+                          if (node) {
+                            node.style.height = "auto";
+                            node.style.height = `${node.scrollHeight}px`;
+                          }
+                        }}
+                        placeholder="Trabajos realizados: limpieza, cambio de piezas, instalaciones..."
                         className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white text-slate-800 overflow-hidden resize-none"
                       />
                     </div>
@@ -3506,10 +3534,21 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               {selectedOrderForModal.diagnosticNotes && (
                 <div className="space-y-0.5">
                   <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
-                    DIAGNÓSTICO TÉCNICO Y AVANCES:
+                    DIAGNÓSTICO:
                   </h4>
-                  <p className="text-slate-810 bg-slate-55 border border-slate-200 rounded-md py-1.5 px-2.5 font-mono whitespace-pre-line text-xs leading-normal">
+                  <p className="text-slate-810 bg-slate-55 border border-slate-200 rounded-md py-1.5 px-2.5 font-sans whitespace-pre-line text-xs leading-normal">
                     {selectedOrderForModal.diagnosticNotes}
+                  </p>
+                </div>
+              )}
+
+              {selectedOrderForModal.workPerformed && (
+                <div className="space-y-0.5">
+                  <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
+                    TRABAJO REALIZADO:
+                  </h4>
+                  <p className="text-slate-810 bg-slate-55 border border-slate-200 rounded-md py-1.5 px-2.5 font-sans whitespace-pre-line text-xs leading-normal">
+                    {selectedOrderForModal.workPerformed}
                   </p>
                 </div>
               )}
@@ -3717,9 +3756,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       { tag: "{mano_obra}", desc: "Mano Obra" },
                       { tag: "{info_mano_obra}", desc: "Detalle Mano Obra" },
                       { tag: "{info_repuestos}", desc: "Repuestos" },
-                      { tag: "{notas}", desc: "Notas de Diagnóstico" },
+                      { tag: "{notas}", desc: "Diagnóstico" },
+                      { tag: "{trabajo_realizado}", desc: "Trabajo Realizado" },
                       { tag: "{tecnico}", desc: "Técnico" },
-                      { tag: "{trabajos_realizados}", desc: "Trabajos Realizados" },
+                      { tag: "{trabajos_realizados}", desc: "Diagnóstico + Trabajo" },
                       { tag: "{info_mano_obra_listo}", desc: "Mano Obra (Listo)" },
                       { tag: "{info_repuestos_listo}", desc: "Repuestos con precios" },
                     ].map((item) => (

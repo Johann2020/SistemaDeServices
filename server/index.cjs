@@ -139,7 +139,7 @@ app.post('/api/migrate', (req, res) => {
             clientPhone: order.clientPhone || '', deviceType: order.deviceType || '',
             brand: order.brand || '', model: order.model || '', serialNumber: order.serialNumber || '',
             description: order.description || '', reportedProblem: order.reportedProblem || '',
-            plannedWork: order.plannedWork || '', diagnosticNotes: order.diagnosticNotes || '',
+            plannedWork: order.plannedWork || '', diagnosticNotes: order.diagnosticNotes || '', workPerformed: order.workPerformed || '',
             devicePassword: order.devicePassword || '', devicePattern: order.devicePattern || '',
             priority: order.priority || 'Media', status: order.status || 'Ingresado',
             assignedTechnician: order.assignedTechnician || '', laborCost: order.laborCost || 0,
