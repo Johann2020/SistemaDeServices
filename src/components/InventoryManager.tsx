@@ -1384,8 +1384,37 @@ export const InventoryManager: React.FC = () => {
                         ({marginPercentValue}% Ganancia)
                       </span>
                     </td>
-                    <td className="py-4 px-4 font-black text-slate-700">
-                      {item.stock} unidades
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newStock = Math.max(0, item.stock - 1);
+                            updateInventoryItem(item.id, { stock: newStock });
+                          }}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs transition cursor-pointer"
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          value={item.stock}
+                          onChange={(e) => {
+                            const val = Math.max(0, parseInt(e.target.value) || 0);
+                            updateInventoryItem(item.id, { stock: val });
+                          }}
+                          className="w-12 text-center text-xs font-black text-slate-700 bg-slate-50 border border-slate-200 rounded py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            updateInventoryItem(item.id, { stock: item.stock + 1 });
+                          }}
+                          className="w-6 h-6 flex items-center justify-center rounded bg-slate-100 hover:bg-indigo-100 text-slate-600 hover:text-indigo-700 font-bold text-xs transition cursor-pointer"
+                        >
+                          +
+                        </button>
+                      </div>
                     </td>
                     <td className="py-4 px-4">
                       <span

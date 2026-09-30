@@ -171,11 +171,11 @@ export const BudgetModule: React.FC = () => {
 
   // Part suggestions autocomplete list
   const suggestedParts = useMemo(() => {
-    if (!partQuery.trim()) return [];
-    return inventory.filter(p => 
-      p.name.toLowerCase().includes(partQuery.toLowerCase()) || 
+    if (!partQuery.trim()) return inventory.slice(0, 8);
+    return inventory.filter(p =>
+      p.name.toLowerCase().includes(partQuery.toLowerCase()) ||
       p.sku.toLowerCase().includes(partQuery.toLowerCase())
-    ).slice(0, 5);
+    ).slice(0, 8);
   }, [partQuery, inventory]);
 
   const handleSelectSuggestedClient = (client: typeof clients[0]) => {
