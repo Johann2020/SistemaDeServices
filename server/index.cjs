@@ -247,8 +247,8 @@ app.post('/api/migrate', express.json({ limit: '50mb' }), (req, res) => {
     migrate();
     res.json({ success: true });
   } catch (err) {
-    console.error('Migration error:', err.message);
-    res.status(500).json({ error: 'Migration failed: ' + err.message });
+    console.error('Error en migración:', err.message);
+    res.status(500).json({ error: 'Error en migración: ' + err.message });
   }
 });
 

@@ -18,8 +18,8 @@ router.get('/', (req, res) => {
     const users = getAll(req.db, 'users').map(stripPassword);
     res.json(users);
   } catch (err) {
-    console.error('Error fetching users:', err.message);
-    res.status(500).json({ error: 'Error fetching users' });
+    console.error('Error al obtener usuarios:', err.message);
+    res.status(500).json({ error: 'Error al obtener usuarios' });
   }
 });
 
@@ -41,8 +41,8 @@ router.post('/', async (req, res) => {
     const user = getById(req.db, 'users', data.id);
     res.status(201).json(stripPassword(user));
   } catch (err) {
-    console.error('Error creating user:', err.message);
-    res.status(500).json({ error: 'Error creating user' });
+    console.error('Error al crear usuario:', err.message);
+    res.status(500).json({ error: 'Error al crear usuario' });
   }
 });
 
@@ -50,7 +50,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const existing = getById(req.db, 'users', req.params.id);
-    if (!existing) return res.status(404).json({ error: 'User not found' });
+    if (!existing) return res.status(404).json({ error: 'Usuario no encontrado' });
 
     const data = {};
     for (const key of ALLOWED_FIELDS) {
@@ -65,8 +65,8 @@ router.put('/:id', async (req, res) => {
     const user = getById(req.db, 'users', req.params.id);
     res.json(stripPassword(user));
   } catch (err) {
-    console.error('Error updating user:', err.message);
-    res.status(500).json({ error: 'Error updating user' });
+    console.error('Error al actualizar usuario:', err.message);
+    res.status(500).json({ error: 'Error al actualizar usuario' });
   }
 });
 
@@ -74,12 +74,12 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const existing = getById(req.db, 'users', req.params.id);
-    if (!existing) return res.status(404).json({ error: 'User not found' });
+    if (!existing) return res.status(404).json({ error: 'Usuario no encontrado' });
     remove(req.db, 'users', req.params.id);
     res.json({ success: true });
   } catch (err) {
-    console.error('Error deleting user:', err.message);
-    res.status(500).json({ error: 'Error deleting user' });
+    console.error('Error al eliminar usuario:', err.message);
+    res.status(500).json({ error: 'Error al eliminar usuario' });
   }
 });
 
@@ -87,29 +87,29 @@ router.delete('/:id', (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    if (!email) return res.status(400).json({ error: 'Email is required' });
+    if (!email) return res.status(400).json({ error: 'El email es requerido' });
 
     const user = req.db.prepare('SELECT * FROM users WHERE email = ?').get(email);
-    if (!user) return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user) return res.status(401).json({ error: 'Credenciales inválidas' });
 
     if (user.password) {
       const isOldPlaintext = !user.password.startsWith('$2a$') && !user.password.startsWith('$2b$');
       if (isOldPlaintext) {
         if (user.password !== password) {
-          return res.status(401).json({ error: 'Invalid credentials' });
+          return res.status(401).json({ error: 'Credenciales inválidas' });
         }
         const hashed = await bcrypt.hash(password, 10);
         req.db.prepare('UPDATE users SET password = ? WHERE id = ?').run(hashed, user.id);
       } else {
         const match = await bcrypt.compare(password, user.password);
-        if (!match) return res.status(401).json({ error: 'Invalid credentials' });
+        if (!match) return res.status(401).json({ error: 'Credenciales inválidas' });
       }
     }
 
     res.json(stripPassword(user));
   } catch (err) {
-    console.error('Error during login:', err.message);
-    res.status(500).json({ error: 'Error during login' });
+    console.error('Error en login:', err.message);
+    res.status(500).json({ error: 'Error en login' });
   }
 });
 

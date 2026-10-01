@@ -48,19 +48,19 @@ router.get('/', (req, res) => {
   try {
     res.json(getAllOrdersWithRelations(req.db));
   } catch (err) {
-    console.error('Error fetching orders:', err.message);
-    res.status(500).json({ error: 'Error fetching orders' });
+    console.error('Error al obtener órdenes:', err.message);
+    res.status(500).json({ error: 'Error al obtener órdenes' });
   }
 });
 
 router.get('/:id', (req, res) => {
   try {
     const order = getOrderWithRelations(req.db, req.params.id);
-    if (!order) return res.status(404).json({ error: 'Order not found' });
+    if (!order) return res.status(404).json({ error: 'Orden no encontrada' });
     res.json(order);
   } catch (err) {
-    console.error('Error fetching order:', err.message);
-    res.status(500).json({ error: 'Error fetching order' });
+    console.error('Error al obtener orden:', err.message);
+    res.status(500).json({ error: 'Error al obtener orden' });
   }
 });
 
@@ -99,15 +99,15 @@ router.post('/', (req, res) => {
 
     res.status(201).json(getOrderWithRelations(req.db, data.id));
   } catch (err) {
-    console.error('Error creating order:', err.message);
-    res.status(500).json({ error: 'Error creating order' });
+    console.error('Error al crear orden:', err.message);
+    res.status(500).json({ error: 'Error al crear orden' });
   }
 });
 
 router.put('/:id', (req, res) => {
   try {
     const existing = req.db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Order not found' });
+    if (!existing) return res.status(404).json({ error: 'Orden no encontrada' });
 
     const data = req.body;
     const partsUsed = data.partsUsed;
@@ -142,30 +142,30 @@ router.put('/:id', (req, res) => {
 
     res.json(getOrderWithRelations(req.db, req.params.id));
   } catch (err) {
-    console.error('Error updating order:', err.message);
-    res.status(500).json({ error: 'Error updating order' });
+    console.error('Error al actualizar orden:', err.message);
+    res.status(500).json({ error: 'Error al actualizar orden' });
   }
 });
 
 router.delete('/:id', (req, res) => {
   try {
     const existing = req.db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Order not found' });
+    if (!existing) return res.status(404).json({ error: 'Orden no encontrada' });
     remove(req.db, 'orders', req.params.id);
     res.json({ success: true });
   } catch (err) {
-    console.error('Error deleting order:', err.message);
-    res.status(500).json({ error: 'Error deleting order' });
+    console.error('Error al eliminar orden:', err.message);
+    res.status(500).json({ error: 'Error al eliminar orden' });
   }
 });
 
 router.patch('/:id/status', (req, res) => {
   try {
     const existing = req.db.prepare('SELECT * FROM orders WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Order not found' });
+    if (!existing) return res.status(404).json({ error: 'Orden no encontrada' });
 
     const { status } = req.body;
-    if (!status) return res.status(400).json({ error: 'Status is required' });
+    if (!status) return res.status(400).json({ error: 'El estado es requerido' });
 
     const now = new Date().toISOString();
     const updateStatus = req.db.transaction(() => {
@@ -178,8 +178,8 @@ router.patch('/:id/status', (req, res) => {
 
     res.json(getOrderWithRelations(req.db, req.params.id));
   } catch (err) {
-    console.error('Error updating order status:', err.message);
-    res.status(500).json({ error: 'Error updating order status' });
+    console.error('Error al actualizar estado de orden:', err.message);
+    res.status(500).json({ error: 'Error al actualizar estado de orden' });
   }
 });
 

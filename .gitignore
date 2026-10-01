@@ -12,4 +12,6 @@ server/data/
 *.db-wal
 *.db-shm
 migrated_data/
+migrate_*.js
+move_*.js
 *.rar

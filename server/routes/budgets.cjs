@@ -35,8 +35,8 @@ router.get('/', (req, res) => {
     const budgets = getAllBudgetsWithItems(req.db);
     res.json(budgets);
   } catch (err) {
-    console.error('Error fetching budgets:', err.message);
-    res.status(500).json({ error: 'Error fetching budgets' });
+    console.error('Error al obtener presupuestos:', err.message);
+    res.status(500).json({ error: 'Error al obtener presupuestos' });
   }
 });
 
@@ -44,11 +44,11 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   try {
     const budget = getBudgetWithItems(req.db, req.params.id);
-    if (!budget) return res.status(404).json({ error: 'Budget not found' });
+    if (!budget) return res.status(404).json({ error: 'Presupuesto no encontrado' });
     res.json(budget);
   } catch (err) {
-    console.error('Error fetching budget:', err.message);
-    res.status(500).json({ error: 'Error fetching budget' });
+    console.error('Error al obtener presupuesto:', err.message);
+    res.status(500).json({ error: 'Error al obtener presupuesto' });
   }
 });
 
@@ -77,8 +77,8 @@ router.post('/', (req, res) => {
     const budget = getBudgetWithItems(req.db, data.id);
     res.status(201).json(budget);
   } catch (err) {
-    console.error('Error creating budget:', err.message);
-    res.status(500).json({ error: 'Error creating budget' });
+    console.error('Error al crear presupuesto:', err.message);
+    res.status(500).json({ error: 'Error al crear presupuesto' });
   }
 });
 
@@ -86,7 +86,7 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const existing = req.db.prepare('SELECT * FROM budgets WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Budget not found' });
+    if (!existing) return res.status(404).json({ error: 'Presupuesto no encontrado' });
 
     const data = req.body;
     const items = data.items;
@@ -112,8 +112,8 @@ router.put('/:id', (req, res) => {
     const budget = getBudgetWithItems(req.db, req.params.id);
     res.json(budget);
   } catch (err) {
-    console.error('Error updating budget:', err.message);
-    res.status(500).json({ error: 'Error updating budget' });
+    console.error('Error al actualizar presupuesto:', err.message);
+    res.status(500).json({ error: 'Error al actualizar presupuesto' });
   }
 });
 
@@ -121,12 +121,12 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const existing = req.db.prepare('SELECT * FROM budgets WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Budget not found' });
+    if (!existing) return res.status(404).json({ error: 'Presupuesto no encontrado' });
     remove(req.db, 'budgets', req.params.id);
     res.json({ success: true });
   } catch (err) {
-    console.error('Error deleting budget:', err.message);
-    res.status(500).json({ error: 'Error deleting budget' });
+    console.error('Error al eliminar presupuesto:', err.message);
+    res.status(500).json({ error: 'Error al eliminar presupuesto' });
   }
 });
 

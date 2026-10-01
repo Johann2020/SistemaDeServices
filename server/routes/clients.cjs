@@ -7,19 +7,19 @@ router.get('/', (req, res) => {
   try {
     res.json(getAll(req.db, 'clients'));
   } catch (err) {
-    console.error('Error fetching clients:', err.message);
-    res.status(500).json({ error: 'Error fetching clients' });
+    console.error('Error al obtener clientes:', err.message);
+    res.status(500).json({ error: 'Error al obtener clientes' });
   }
 });
 
 router.get('/:id', (req, res) => {
   try {
     const client = getById(req.db, 'clients', req.params.id);
-    if (!client) return res.status(404).json({ error: 'Client not found' });
+    if (!client) return res.status(404).json({ error: 'Cliente no encontrado' });
     res.json(client);
   } catch (err) {
-    console.error('Error fetching client:', err.message);
-    res.status(500).json({ error: 'Error fetching client' });
+    console.error('Error al obtener cliente:', err.message);
+    res.status(500).json({ error: 'Error al obtener cliente' });
   }
 });
 
@@ -32,28 +32,28 @@ router.post('/', (req, res) => {
     const client = getById(req.db, 'clients', data.id);
     res.status(201).json(client);
   } catch (err) {
-    console.error('Error creating client:', err.message);
-    res.status(500).json({ error: 'Error creating client' });
+    console.error('Error al crear cliente:', err.message);
+    res.status(500).json({ error: 'Error al crear cliente' });
   }
 });
 
 router.put('/:id', (req, res) => {
   try {
     const existing = getById(req.db, 'clients', req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Client not found' });
+    if (!existing) return res.status(404).json({ error: 'Cliente no encontrado' });
     update(req.db, 'clients', req.params.id, req.body);
     const client = getById(req.db, 'clients', req.params.id);
     res.json(client);
   } catch (err) {
-    console.error('Error updating client:', err.message);
-    res.status(500).json({ error: 'Error updating client' });
+    console.error('Error al actualizar cliente:', err.message);
+    res.status(500).json({ error: 'Error al actualizar cliente' });
   }
 });
 
 router.delete('/:id', (req, res) => {
   try {
     const existing = getById(req.db, 'clients', req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Client not found' });
+    if (!existing) return res.status(404).json({ error: 'Cliente no encontrado' });
     const deleteAll = req.db.transaction(() => {
       const orderIds = req.db.prepare('SELECT id FROM orders WHERE clientId = ?').all(req.params.id).map(r => r.id);
       for (const oid of orderIds) {
@@ -71,8 +71,8 @@ router.delete('/:id', (req, res) => {
     deleteAll();
     res.json({ success: true });
   } catch (err) {
-    console.error('Error deleting client:', err.message);
-    res.status(500).json({ error: 'Error deleting client' });
+    console.error('Error al eliminar cliente:', err.message);
+    res.status(500).json({ error: 'Error al eliminar cliente' });
   }
 });
 

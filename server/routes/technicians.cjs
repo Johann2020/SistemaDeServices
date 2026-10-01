@@ -9,8 +9,8 @@ router.get('/', (req, res) => {
     const technicians = getAll(req.db, 'technicians');
     res.json(technicians);
   } catch (err) {
-    console.error('Error fetching technicians:', err.message);
-    res.status(500).json({ error: 'Error fetching technicians' });
+    console.error('Error al obtener técnicos:', err.message);
+    res.status(500).json({ error: 'Error al obtener técnicos' });
   }
 });
 
@@ -18,11 +18,11 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   try {
     const technician = getById(req.db, 'technicians', req.params.id);
-    if (!technician) return res.status(404).json({ error: 'Technician not found' });
+    if (!technician) return res.status(404).json({ error: 'Técnico no encontrado' });
     res.json(technician);
   } catch (err) {
-    console.error('Error fetching technician:', err.message);
-    res.status(500).json({ error: 'Error fetching technician' });
+    console.error('Error al obtener técnico:', err.message);
+    res.status(500).json({ error: 'Error al obtener técnico' });
   }
 });
 
@@ -36,8 +36,8 @@ router.post('/', (req, res) => {
     const technician = getById(req.db, 'technicians', data.id);
     res.status(201).json(technician);
   } catch (err) {
-    console.error('Error creating technician:', err.message);
-    res.status(500).json({ error: 'Error creating technician' });
+    console.error('Error al crear técnico:', err.message);
+    res.status(500).json({ error: 'Error al crear técnico' });
   }
 });
 
@@ -45,13 +45,13 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const existing = getById(req.db, 'technicians', req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Technician not found' });
+    if (!existing) return res.status(404).json({ error: 'Técnico no encontrado' });
     update(req.db, 'technicians', req.params.id, req.body);
     const technician = getById(req.db, 'technicians', req.params.id);
     res.json(technician);
   } catch (err) {
-    console.error('Error updating technician:', err.message);
-    res.status(500).json({ error: 'Error updating technician' });
+    console.error('Error al actualizar técnico:', err.message);
+    res.status(500).json({ error: 'Error al actualizar técnico' });
   }
 });
 
@@ -59,12 +59,12 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const existing = getById(req.db, 'technicians', req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Technician not found' });
+    if (!existing) return res.status(404).json({ error: 'Técnico no encontrado' });
     remove(req.db, 'technicians', req.params.id);
     res.json({ success: true });
   } catch (err) {
-    console.error('Error deleting technician:', err.message);
-    res.status(500).json({ error: 'Error deleting technician' });
+    console.error('Error al eliminar técnico:', err.message);
+    res.status(500).json({ error: 'Error al eliminar técnico' });
   }
 });
 

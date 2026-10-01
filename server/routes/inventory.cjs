@@ -9,8 +9,8 @@ router.get('/', (req, res) => {
     const items = getAll(req.db, 'inventory');
     res.json(items);
   } catch (err) {
-    console.error('Error fetching inventory:', err.message);
-    res.status(500).json({ error: 'Error fetching inventory' });
+    console.error('Error al obtener inventario:', err.message);
+    res.status(500).json({ error: 'Error al obtener inventario' });
   }
 });
 
@@ -18,11 +18,11 @@ router.get('/', (req, res) => {
 router.get('/:id', (req, res) => {
   try {
     const item = getById(req.db, 'inventory', req.params.id);
-    if (!item) return res.status(404).json({ error: 'Item not found' });
+    if (!item) return res.status(404).json({ error: 'Repuesto no encontrado' });
     res.json(item);
   } catch (err) {
-    console.error('Error fetching inventory item:', err.message);
-    res.status(500).json({ error: 'Error fetching inventory item' });
+    console.error('Error al obtener repuesto:', err.message);
+    res.status(500).json({ error: 'Error al obtener repuesto' });
   }
 });
 
@@ -35,8 +35,8 @@ router.post('/', (req, res) => {
     const item = getById(req.db, 'inventory', data.id);
     res.status(201).json(item);
   } catch (err) {
-    console.error('Error creating inventory item:', err.message);
-    res.status(500).json({ error: 'Error creating inventory item' });
+    console.error('Error al crear repuesto:', err.message);
+    res.status(500).json({ error: 'Error al crear repuesto' });
   }
 });
 
@@ -44,13 +44,13 @@ router.post('/', (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const existing = getById(req.db, 'inventory', req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Item not found' });
+    if (!existing) return res.status(404).json({ error: 'Repuesto no encontrado' });
     update(req.db, 'inventory', req.params.id, req.body);
     const item = getById(req.db, 'inventory', req.params.id);
     res.json(item);
   } catch (err) {
-    console.error('Error updating inventory item:', err.message);
-    res.status(500).json({ error: 'Error updating inventory item' });
+    console.error('Error al actualizar repuesto:', err.message);
+    res.status(500).json({ error: 'Error al actualizar repuesto' });
   }
 });
 
@@ -58,12 +58,12 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   try {
     const existing = getById(req.db, 'inventory', req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Item not found' });
+    if (!existing) return res.status(404).json({ error: 'Repuesto no encontrado' });
     remove(req.db, 'inventory', req.params.id);
     res.json({ success: true });
   } catch (err) {
-    console.error('Error deleting inventory item:', err.message);
-    res.status(500).json({ error: 'Error deleting inventory item' });
+    console.error('Error al eliminar repuesto:', err.message);
+    res.status(500).json({ error: 'Error al eliminar repuesto' });
   }
 });
 

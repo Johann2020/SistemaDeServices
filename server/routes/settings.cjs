@@ -12,8 +12,8 @@ router.get('/', (req, res) => {
     }
     res.json(settings);
   } catch (err) {
-    console.error('Error fetching settings:', err.message);
-    res.status(500).json({ error: 'Error fetching settings' });
+    console.error('Error al obtener configuración:', err.message);
+    res.status(500).json({ error: 'Error al obtener configuración' });
   }
 });
 
@@ -21,11 +21,11 @@ router.get('/', (req, res) => {
 router.get('/:key', (req, res) => {
   try {
     const row = req.db.prepare('SELECT * FROM settings WHERE key = ?').get(req.params.key);
-    if (!row) return res.status(404).json({ error: 'Setting not found' });
+    if (!row) return res.status(404).json({ error: 'Configuración no encontrada' });
     res.json({ key: row.key, value: row.value });
   } catch (err) {
-    console.error('Error fetching setting:', err.message);
-    res.status(500).json({ error: 'Error fetching setting' });
+    console.error('Error al obtener configuración:', err.message);
+    res.status(500).json({ error: 'Error al obtener configuración' });
   }
 });
 
@@ -37,8 +37,8 @@ router.put('/:key', (req, res) => {
     req.db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)').run(req.params.key, valueStr);
     res.json({ key: req.params.key, value: valueStr });
   } catch (err) {
-    console.error('Error setting value:', err.message);
-    res.status(500).json({ error: 'Error setting value' });
+    console.error('Error al guardar configuración:', err.message);
+    res.status(500).json({ error: 'Error al guardar configuración' });
   }
 });
 
@@ -56,8 +56,8 @@ router.put('/', (req, res) => {
     bulkUpsert(Object.entries(data));
     res.json({ success: true });
   } catch (err) {
-    console.error('Error setting values:', err.message);
-    res.status(500).json({ error: 'Error setting values' });
+    console.error('Error al guardar configuración:', err.message);
+    res.status(500).json({ error: 'Error al guardar configuración' });
   }
 });
 

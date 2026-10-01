@@ -182,11 +182,23 @@ function getTenantDb(tenantId) {
 }
 
 function getAll(db, table) {
+  assertTable(table);
   return db.prepare(`SELECT * FROM ${table}`).all();
 }
 
 function getById(db, table, id) {
+  assertTable(table);
   return db.prepare(`SELECT * FROM ${table} WHERE id = ?`).get(id);
+}
+
+const VALID_TABLES = new Set([
+  'clients', 'orders', 'order_parts', 'order_status_history',
+  'inventory', 'technicians', 'budgets', 'budget_items',
+  'users', 'settings',
+]);
+
+function assertTable(table) {
+  if (!VALID_TABLES.has(table)) throw new Error(`Invalid table: ${table}`);
 }
 
 const VALID_COL = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
@@ -200,6 +212,7 @@ function sanitizeKeys(data) {
 }
 
 function insert(db, table, data) {
+  assertTable(table);
   const safe = sanitizeKeys(data);
   const keys = Object.keys(safe);
   if (keys.length === 0) return;
@@ -211,6 +224,7 @@ function insert(db, table, data) {
 }
 
 function update(db, table, id, data) {
+  assertTable(table);
   const safe = sanitizeKeys(data);
   const keys = Object.keys(safe).filter(k => k !== 'id');
   if (keys.length === 0) return;
@@ -221,6 +235,7 @@ function update(db, table, id, data) {
 }
 
 function remove(db, table, id) {
+  assertTable(table);
   return db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
 }
 
