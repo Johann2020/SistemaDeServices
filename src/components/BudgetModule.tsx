@@ -776,6 +776,7 @@ export const BudgetModule: React.FC = () => {
               onClick={() => {
                 setIsCreating(false);
                 setIsEditing(false);
+                setViewingBudget(null);
               }}
               className="text-slate-400 hover:text-slate-600 cursor-pointer p-1"
             >
@@ -1327,6 +1328,7 @@ export const BudgetModule: React.FC = () => {
                 onClick={() => {
                   setIsCreating(false);
                   setIsEditing(false);
+                  setViewingBudget(null);
                 }}
                 className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 rounded-xl px-4 py-2.5 text-xs font-bold transition-all cursor-pointer select-none text-center"
               >
