@@ -400,6 +400,7 @@ export const BudgetModule: React.FC = () => {
 
     setClientQuery('');
     setPartQuery('');
+    setViewingBudget(budget);
     setIsEditing(true);
     setIsCreating(false);
   };
