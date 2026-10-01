@@ -1300,7 +1300,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       .map(item => {
         const invMatch = inventory.find(p => p.name.trim().toLowerCase() === item.name.trim().toLowerCase());
         return {
-          id: invMatch?.id || item.id || `pt-${Math.random().toString(36).substring(2, 9)}`,
+          id: `pt-${Math.random().toString(36).substring(2, 9)}`,
           name: item.name,
           price: item.price,
           costPrice: invMatch?.costPrice ?? Math.round(item.price * 0.7),
@@ -1321,12 +1321,8 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (existingOrder) {
       // Update the existing order in a single state update to avoid race conditions
-      const updatedParts = [...(existingOrder.partsUsed || [])];
-      spares.forEach(sp => {
-        if (!updatedParts.some(p => p.id === sp.id || p.name.trim().toLowerCase() === sp.name.trim().toLowerCase())) {
-          updatedParts.push(sp);
-        }
-      });
+      const originalParts = existingOrder.partsUsed || [];
+      const updatedParts = [...originalParts, ...spares];
       const newLaborCost = (existingOrder.laborCost || 0) + labor;
       const totalCost = newLaborCost + updatedParts.reduce((sum, p) => sum + (p.price * p.quantity), 0);
       const currentPlanned = existingOrder.plannedWork || '';

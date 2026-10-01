@@ -728,9 +728,8 @@ export const BudgetModule: React.FC = () => {
                             onClick={() => openEditForm(b)}
                             className="p-1 px-1.5 hover:bg-amber-50 hover:text-amber-600 rounded transition font-bold flex items-center space-x-1"
                             title="Editar"
-                            disabled={b.status === 'Aprobado'}
                           >
-                            <Edit2 className={`h-4.5 w-4.5 ${b.status === 'Aprobado' ? 'text-slate-300' : 'text-slate-400 hover:text-amber-600'}`} />
+                            <Edit2 className="h-4.5 w-4.5 text-slate-400 hover:text-amber-600" />
                           </button>
                           <button
                             type="button"
