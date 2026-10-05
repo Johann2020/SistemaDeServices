@@ -602,7 +602,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let monthlyProfit = 0;
     const monthlyRevenue = orders
       .filter(o => {
-        if (o.status !== 'Entregado' && o.paymentStatus !== 'Pagado') return false;
+        if (o.status !== 'Entregado') return false;
         const billingDate = getOrderBillingDate(o);
         return billingDate.getMonth() === currentMonth && billingDate.getFullYear() === currentYear;
       })
