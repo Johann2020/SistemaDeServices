@@ -266,7 +266,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ...o,
             deviceType: normalizeDeviceType(o.deviceType),
             partsUsed: o.partsUsed || [],
-            statusHistory: o.statusHistory || [{ status: 'Ingresado', timestamp: o.createdAt }],
+            statusHistory: (o.statusHistory && o.statusHistory.length > 0) ? o.statusHistory : [{ status: 'Ingresado', timestamp: o.createdAt }],
             laborCost: o.laborCost || 0,
             totalCost: o.totalCost || 0,
           })));
@@ -596,7 +596,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (entregadoEntry) return new Date(entregadoEntry.timestamp);
         return new Date(o.statusHistory[o.statusHistory.length - 1].timestamp);
       }
-      return new Date(o.updatedAt || o.createdAt);
+      return new Date(o.createdAt);
     };
 
     let monthlyProfit = 0;
@@ -757,6 +757,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             history.push({ status: data.status, timestamp: now });
           }
           merged.statusHistory = history;
+          apiData.statusHistory = history;
         }
 
         return merged;
