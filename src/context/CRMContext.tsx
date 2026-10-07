@@ -600,12 +600,21 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     let monthlyProfit = 0;
-    const monthlyRevenue = orders
-      .filter(o => {
-        if (o.status !== 'Entregado') return false;
-        const billingDate = getOrderBillingDate(o);
-        return billingDate.getMonth() === currentMonth && billingDate.getFullYear() === currentYear;
-      })
+    const revenueOrders = orders.filter(o => {
+      if (o.status !== 'Entregado') return false;
+      const billingDate = getOrderBillingDate(o);
+      return billingDate.getMonth() === currentMonth && billingDate.getFullYear() === currentYear;
+    });
+
+    if (revenueOrders.length > 0) {
+      console.warn('[DEBUG Revenue] Órdenes contadas como ingreso este mes:', revenueOrders.map(o => ({
+        id: o.id, cliente: o.clientName, status: o.status, total: o.totalCost,
+        statusHistory: o.statusHistory, updatedAt: o.updatedAt, createdAt: o.createdAt,
+        billingDate: getOrderBillingDate(o).toISOString()
+      })));
+    }
+
+    const monthlyRevenue = revenueOrders
       .reduce((sum, o) => {
         const partsCostSum = o.partsUsed.reduce((partsSum, p) => {
           const pCost = p.costPrice !== undefined ? p.costPrice : Math.round(p.price * 0.7);
