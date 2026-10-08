@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useCRM } from '../context/CRMContext';
 import { Client } from '../types';
 import { GeorefFields } from './GeorefFields';
@@ -34,6 +34,8 @@ export const ClientList: React.FC<ClientListProps> = ({
 }) => {
   const { clients, orders, addClient, updateClientDetails, deleteClientWithData, showToast } = useCRM();
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [isAddingClient, setIsAddingClient] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deletingClient, setDeletingClient] = useState<Client | null>(null);
@@ -118,7 +120,7 @@ export const ClientList: React.FC<ClientListProps> = ({
     resetForm();
   };
 
-  const filteredClients = clients.filter(c => 
+  const filteredClients = clients.filter(c =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (c.phone && c.phone.includes(searchQuery)) ||
     (c.phone2 && c.phone2.includes(searchQuery)) ||
@@ -126,6 +128,16 @@ export const ClientList: React.FC<ClientListProps> = ({
     (c.provincia && c.provincia.toLowerCase().includes(searchQuery.toLowerCase())) ||
     (c.localidad && c.localidad.toLowerCase().includes(searchQuery.toLowerCase()))
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredClients.length / itemsPerPage));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, filteredClients.length);
+  const paginatedClients = filteredClients.slice(startIndex, endIndex);
 
   const getClientLastActivity = (client: Client) => {
     const clientOrders = orders.filter(o => o.clientId === client.id);
@@ -412,7 +424,7 @@ export const ClientList: React.FC<ClientListProps> = ({
 
       {/* Clients Bento Deck */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {filteredClients.map((client) => {
+        {paginatedClients.map((client) => {
           // Find all orders that belong to this client
           const clientOrders = orders.filter(o => o.clientId === client.id);
 
@@ -545,6 +557,51 @@ export const ClientList: React.FC<ClientListProps> = ({
           );
         })}
       </div>
+
+      {filteredClients.length > 0 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 px-1">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span>Mostrando {startIndex + 1}-{endIndex} de {filteredClients.length} clientes</span>
+            <span className="text-slate-300">|</span>
+            <label className="flex items-center gap-1">
+              <span>Por pagina:</span>
+              <select
+                value={itemsPerPage}
+                onChange={(e) => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="border border-slate-200 rounded-lg px-2 py-1 text-xs text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </label>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={safeCurrentPage <= 1}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            >
+              Anterior
+            </button>
+            <span className="text-xs text-slate-600 font-medium px-2">
+              Pagina {safeCurrentPage} de {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={safeCurrentPage >= totalPages}
+              className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
+            >
+              Siguiente
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MODAL DE ELIMINACIÓN DE CLIENTE */}
       {deletingClient && (() => {

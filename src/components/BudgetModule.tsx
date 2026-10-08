@@ -47,7 +47,8 @@ export const BudgetModule: React.FC = () => {
     addInventoryItem,
     exchangeRate,
     categoryMargins,
-    ticketSub
+    ticketSub,
+    activeDeviceTypes
   } = useCRM();
 
   const { user } = useAuth();
@@ -1015,13 +1016,9 @@ export const BudgetModule: React.FC = () => {
                           onChange={(e) => setFormDeviceType(e.target.value)}
                           className="w-full bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold focus:outline-hidden focus:border-indigo-500"
                         >
-                          <option value="Notebook">Notebook</option>
-                          <option value="Teléfono">Teléfono</option>
-                          <option value="CPU / PC Desktop">CPU / PC Desktop</option>
-                          <option value="Consola de Videojuegos">Consola</option>
-                          <option value="Tablet">Tablet</option>
-                          <option value="Smartwatch">Smartwatch</option>
-                          <option value="Otro">Otro</option>
+                          {activeDeviceTypes.map(type => (
+                            <option key={type} value={type}>{type}</option>
+                          ))}
                         </select>
                       </div>
 

@@ -1,27 +1,28 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useCRM } from '../context/CRMContext';
-import { DEVICE_TYPES } from '../data';
 import { OrderPriority, Client } from '../types';
 import { GeorefFields } from './GeorefFields';
 import { CustomSelect } from './CustomSelect';
 import { PatternLockInput } from './PatternLockInput';
-import {   UserPlus, 
-  Search, 
-  Laptop, 
-  Smartphone, 
+import { DeviceTypeManager } from './DeviceTypeManager';
+import {   UserPlus,
+  Search,
+  Laptop,
+  Smartphone,
   Tablet,
   Cpu,
-  Package, 
-  FileText, 
-  Calendar, 
-  ChevronDown, 
-  User, 
-  PlusCircle, 
-  Wrench, 
-  CheckCircle2, 
+  Package,
+  FileText,
+  Calendar,
+  ChevronDown,
+  User,
+  PlusCircle,
+  Wrench,
+  CheckCircle2,
   Trash2,
   Lock,
-  X
+  X,
+  Settings
 } from 'lucide-react';
 
 interface OrderFormProps {
@@ -31,17 +32,19 @@ interface OrderFormProps {
 }
 
 export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onClientModalToggle }) => {
-  const { 
-    clients, 
-    addClient, 
-    addOrder, 
+  const {
+    clients,
+    addClient,
+    addOrder,
     searchClientsPredictive,
     technicians,
     showToast,
-    orders
+    orders,
+    activeDeviceTypes
   } = useCRM();
 
   const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [showDeviceTypeManager, setShowDeviceTypeManager] = useState(false);
 
   useEffect(() => {
     if (onClientModalToggle) {
@@ -612,7 +615,17 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-500 block">Tipo de Dispositivo</label>
+                <label className="text-xs font-semibold text-slate-500 flex items-center gap-1.5">
+                  Tipo de Dispositivo
+                  <button
+                    type="button"
+                    onClick={() => setShowDeviceTypeManager(true)}
+                    className="p-0.5 hover:bg-slate-200 rounded transition"
+                    title="Gestionar tipos de dispositivo"
+                  >
+                    <Settings className="h-3 w-3 text-slate-400 hover:text-indigo-600" />
+                  </button>
+                </label>
                 {useExistingDevice ? (
                   <div className="w-full text-xs p-2.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 font-bold select-none cursor-not-allowed h-[38px] flex items-center">
                     {deviceType}
@@ -621,7 +634,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
                   <CustomSelect
                     value={deviceType}
                     onChange={(val) => setDeviceType(val)}
-                    options={DEVICE_TYPES.map(type => ({ value: type, label: type }))}
+                    options={activeDeviceTypes.map(type => ({ value: type, label: type }))}
                   />
                 )}
               </div>
@@ -982,6 +995,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
 
         </div>
       )}
+      <DeviceTypeManager isOpen={showDeviceTypeManager} onClose={() => setShowDeviceTypeManager(false)} />
     </div>
   );
 };

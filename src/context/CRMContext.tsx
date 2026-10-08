@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { useAuth } from './AuthContext';
 import { Client, Order, SparePartInventoryItem, OrderStatus, OrderPriority, OrderPart, CRMStats, DelayConfig, Technician, Toast, Budget, BudgetItem, BudgetStatus, PaymentStatus } from '../types';
 import { api } from '../api';
+import { DEVICE_TYPES } from '../data';
 
 export interface ActionHistoryEntry {
   id: string;
@@ -95,6 +96,10 @@ interface CRMContextType {
   updateBudgetDetails: (budgetId: string, data: Partial<Budget>) => void;
   deleteBudget: (budgetId: string) => void;
   convertBudgetToOrder: (budgetId: string, assignedTechnician: string, priority: OrderPriority) => string | null;
+  allDeviceTypes: string[];
+  activeDeviceTypes: string[];
+  addDeviceType: (name: string) => void;
+  setActiveDeviceTypes: (types: string[]) => void;
 }
 
 const CRMContext = createContext<CRMContextType | undefined>(undefined);
@@ -165,6 +170,9 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     monthlyProfit: 0,
     activeTickets: 0
   });
+
+  const [allDeviceTypes, setAllDeviceTypes] = useState<string[]>([...DEVICE_TYPES]);
+  const [activeDeviceTypes, setActiveDeviceTypesState] = useState<string[]>([...DEVICE_TYPES]);
 
   const [exchangeRate, setExchangeRate] = useState<number>(1050);
   const [categoryMargins, setCategoryMargins] = useState<Record<string, number>>({
@@ -240,6 +248,26 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  const addDeviceType = (name: string) => {
+    setAllDeviceTypes(prev => {
+      if (prev.includes(name)) return prev;
+      const updated = [...prev, name];
+      api.settings.set('allDeviceTypes', JSON.stringify(updated)).catch(console.error);
+      return updated;
+    });
+    setActiveDeviceTypesState(prev => {
+      if (prev.includes(name)) return prev;
+      const updated = [...prev, name];
+      api.settings.set('activeDeviceTypes', JSON.stringify(updated)).catch(console.error);
+      return updated;
+    });
+  };
+
+  const setActiveDeviceTypes = (types: string[]) => {
+    setActiveDeviceTypesState(types);
+    api.settings.set('activeDeviceTypes', JSON.stringify(types)).catch(console.error);
+  };
+
   // Load data from API when tenantId changes
   useEffect(() => {
     if (!activeUser) return;
@@ -288,6 +316,16 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (apiSettings.ticketTitle) setTicketTitle(apiSettings.ticketTitle);
             if (apiSettings.ticketSub) setTicketSub(apiSettings.ticketSub);
             if (apiSettings.ticketTerms) setTicketTerms(apiSettings.ticketTerms);
+            if (apiSettings.allDeviceTypes) {
+              try {
+                const parsed = JSON.parse(apiSettings.allDeviceTypes);
+                const merged = [...new Set([...DEVICE_TYPES, ...parsed])];
+                setAllDeviceTypes(merged);
+              } catch {}
+            }
+            if (apiSettings.activeDeviceTypes) {
+              try { setActiveDeviceTypesState(JSON.parse(apiSettings.activeDeviceTypes)); } catch {}
+            }
           }
 
           setLoadedTenantId(tenantId);
@@ -342,6 +380,19 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTicketTitle(storedTicketTitle || "TICKET DE CONTROL");
     setTicketSub(storedTicketSub || "Laboratorio de Diagnóstico y Reparaciones Especializadas");
     setTicketTerms(storedTicketTerms || DEFAULT_TICKET_TERMS);
+
+    const storedAllDeviceTypes = localStorage.getItem(`crm_${tenantId}_allDeviceTypes`);
+    const storedActiveDeviceTypes = localStorage.getItem(`crm_${tenantId}_activeDeviceTypes`);
+    if (storedAllDeviceTypes) {
+      try {
+        const parsed = JSON.parse(storedAllDeviceTypes);
+        const merged = [...new Set([...DEVICE_TYPES, ...parsed])];
+        setAllDeviceTypes(merged);
+      } catch {}
+    }
+    if (storedActiveDeviceTypes) {
+      try { setActiveDeviceTypesState(JSON.parse(storedActiveDeviceTypes)); } catch {}
+    }
 
     // Load Category Margins
     const defaultLabels: Record<string, number> = {
@@ -1448,7 +1499,11 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateBudgetStatus,
         updateBudgetDetails,
         deleteBudget,
-        convertBudgetToOrder
+        convertBudgetToOrder,
+        allDeviceTypes,
+        activeDeviceTypes,
+        addDeviceType,
+        setActiveDeviceTypes
       }}
     >
       {children}

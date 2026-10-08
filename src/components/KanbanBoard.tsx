@@ -52,7 +52,7 @@ import {
   Home,
   FolderOpen,
 } from "lucide-react";
-import { DEVICE_TYPES } from "../data";
+
 
 interface KanbanBoardProps {
   selectedOrderId: string | null;
@@ -98,6 +98,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     ticketTitle,
     ticketSub,
     ticketTerms,
+    activeDeviceTypes,
   } = useCRM();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -2081,7 +2082,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             value={editDeviceType}
                             onChange={(val) => setEditDeviceType(val)}
                             className="w-full text-xs p-1.5 bg-white border border-slate-200 rounded text-slate-800 font-semibold"
-                            options={DEVICE_TYPES.map((type) => ({
+                            options={activeDeviceTypes.map((type) => ({
                               value: type,
                               label: type,
                             }))}
