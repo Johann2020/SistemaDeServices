@@ -13,6 +13,5 @@ export const DEVICE_TYPES = [
   'Aire Acondicionado / Ventilador',
   'Cafetera',
   'Licuadora / Procesadora',
-  'Cámara Fotográfica',
-  'Otro'
+  'Cámara Fotográfica'
 ];

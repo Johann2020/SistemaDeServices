@@ -181,26 +181,19 @@ function getTenantDb(tenantId) {
   db.exec("UPDATE orders SET deviceType = 'Celular' WHERE deviceType = 'Teléfono'");
   db.exec("UPDATE budgets SET deviceType = 'Celular' WHERE deviceType = 'Teléfono'");
 
-  // Clean 'Teléfono' from persisted device-type settings
-  const dtRow = db.prepare("SELECT value FROM settings WHERE key = 'allDeviceTypes'").get();
-  if (dtRow) {
-    try {
-      const arr = JSON.parse(dtRow.value);
-      if (arr.includes('Teléfono')) {
-        const cleaned = arr.filter(t => t !== 'Teléfono');
-        db.prepare("UPDATE settings SET value = ? WHERE key = 'allDeviceTypes'").run(JSON.stringify(cleaned));
-      }
-    } catch (_) {}
-  }
-  const adtRow = db.prepare("SELECT value FROM settings WHERE key = 'activeDeviceTypes'").get();
-  if (adtRow) {
-    try {
-      const arr = JSON.parse(adtRow.value);
-      if (arr.includes('Teléfono')) {
-        const cleaned = arr.filter(t => t !== 'Teléfono');
-        db.prepare("UPDATE settings SET value = ? WHERE key = 'activeDeviceTypes'").run(JSON.stringify(cleaned));
-      }
-    } catch (_) {}
+  // Clean removed categories from persisted device-type settings
+  const removedTypes = ['Teléfono', 'Otro'];
+  for (const settingKey of ['allDeviceTypes', 'activeDeviceTypes']) {
+    const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(settingKey);
+    if (row) {
+      try {
+        const arr = JSON.parse(row.value);
+        const cleaned = arr.filter(t => !removedTypes.includes(t));
+        if (cleaned.length !== arr.length) {
+          db.prepare("UPDATE settings SET value = ? WHERE key = ?").run(JSON.stringify(cleaned), settingKey);
+        }
+      } catch (_) {}
+    }
   }
 
   dbCache.set(tenantId, db);
