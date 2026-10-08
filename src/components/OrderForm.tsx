@@ -22,7 +22,8 @@ import {   UserPlus,
   Trash2,
   Lock,
   X,
-  Settings
+  Settings,
+  Clock
 } from 'lucide-react';
 
 interface OrderFormProps {
@@ -160,6 +161,54 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
     });
     return Array.from(uniqueMap.values());
   }, [selectedClient, orders]);
+
+  // Autocomplete: brands used for the selected device type
+  const brandSuggestions = useMemo(() => {
+    if (!deviceType) return [];
+    const counts: Record<string, number> = {};
+    orders.forEach(o => {
+      if (o.deviceType === deviceType && o.brand) {
+        counts[o.brand] = (counts[o.brand] || 0) + 1;
+      }
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, count]) => ({ name, count }));
+  }, [orders, deviceType]);
+
+  // Autocomplete: models used for the selected device type + brand
+  const modelSuggestions = useMemo(() => {
+    if (!deviceType || !brand) return [];
+    const counts: Record<string, number> = {};
+    orders.forEach(o => {
+      if (o.deviceType === deviceType && o.brand === brand && o.model) {
+        counts[o.model] = (counts[o.model] || 0) + 1;
+      }
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([name, count]) => ({ name, count }));
+  }, [orders, deviceType, brand]);
+
+  const [isBrandOpen, setIsBrandOpen] = useState(false);
+  const [isModelOpen, setIsModelOpen] = useState(false);
+  const brandContainerRef = useRef<HTMLDivElement>(null);
+  const modelContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (brandContainerRef.current && !brandContainerRef.current.contains(event.target as Node)) {
+        setIsBrandOpen(false);
+      }
+      if (modelContainerRef.current && !modelContainerRef.current.contains(event.target as Node)) {
+        setIsModelOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Sync state when selected client changes
   useEffect(() => {
@@ -639,7 +688,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
                 )}
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-1 relative" ref={brandContainerRef}>
                 <label className="text-xs font-bold text-slate-900 block">Marca *</label>
                 <input
                   type="text"
@@ -648,16 +697,44 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
                   autoComplete="off"
                   placeholder="Ej. Apple, Lenovo, Sony"
                   value={brand}
-                  onChange={(e) => setBrand(e.target.value)}
+                  onFocus={() => { if (!useExistingDevice && brandSuggestions.length > 0) setIsBrandOpen(true); }}
+                  onChange={(e) => { setBrand(e.target.value); setIsBrandOpen(true); setModel(''); }}
                   className={`w-full text-xs p-2.5 border rounded-lg placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100 transition font-medium ${
-                    useExistingDevice 
-                      ? 'bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200 font-bold' 
+                    useExistingDevice
+                      ? 'bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200 font-bold'
                       : 'bg-slate-50 text-slate-800 border-slate-200 focus:bg-white focus:border-slate-300'
                   }`}
                 />
+                {isBrandOpen && !useExistingDevice && (() => {
+                  const filtered = brand
+                    ? brandSuggestions.filter(s => s.name.toLowerCase().includes(brand.toLowerCase()) && s.name !== brand)
+                    : brandSuggestions;
+                  if (filtered.length === 0) return null;
+                  return (
+                    <div className="absolute z-[60] left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg py-1 text-xs animate-scale-up animate-duration-150">
+                      {!brand && (
+                        <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Marcas usadas en {deviceType}
+                        </div>
+                      )}
+                      {filtered.map(({ name, count }) => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => { setBrand(name); setIsBrandOpen(false); setModel(''); }}
+                          className="w-full text-left px-3 py-2 cursor-pointer transition flex items-center justify-between hover:bg-slate-50 text-slate-700"
+                        >
+                          <span>{name}</span>
+                          <span className="text-[10px] text-slate-400 font-medium">{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-1 relative" ref={modelContainerRef}>
                 <label className="text-xs font-bold text-slate-900 block">Modelo Físico *</label>
                 <input
                   type="text"
@@ -666,13 +743,41 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
                   autoComplete="off"
                   placeholder="Ej. iPhone 13 Pro, ThinkPad X1"
                   value={model}
-                  onChange={(e) => setModel(e.target.value)}
+                  onFocus={() => { if (!useExistingDevice && modelSuggestions.length > 0) setIsModelOpen(true); }}
+                  onChange={(e) => { setModel(e.target.value); setIsModelOpen(true); }}
                   className={`w-full text-xs p-2.5 border rounded-lg placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-100 transition font-medium ${
-                    useExistingDevice 
-                      ? 'bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200 font-bold' 
+                    useExistingDevice
+                      ? 'bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200 font-bold'
                       : 'bg-slate-50 text-slate-800 border-slate-200 focus:bg-white focus:border-slate-300'
                   }`}
                 />
+                {isModelOpen && !useExistingDevice && (() => {
+                  const filtered = model
+                    ? modelSuggestions.filter(s => s.name.toLowerCase().includes(model.toLowerCase()) && s.name !== model)
+                    : modelSuggestions;
+                  if (filtered.length === 0) return null;
+                  return (
+                    <div className="absolute z-[60] left-0 right-0 top-full mt-1 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg py-1 text-xs animate-scale-up animate-duration-150">
+                      {!model && (
+                        <div className="px-3 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          Modelos de {brand}
+                        </div>
+                      )}
+                      {filtered.map(({ name, count }) => (
+                        <button
+                          key={name}
+                          type="button"
+                          onClick={() => { setModel(name); setIsModelOpen(false); }}
+                          className="w-full text-left px-3 py-2 cursor-pointer transition flex items-center justify-between hover:bg-slate-50 text-slate-700"
+                        >
+                          <span>{name}</span>
+                          <span className="text-[10px] text-slate-400 font-medium">{count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
