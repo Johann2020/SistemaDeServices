@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, ChevronDown, Loader2, X, Map } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { MapPin, ChevronDown, Loader2, X, Map, Clock } from 'lucide-react';
+import { useCRM } from '../context/CRMContext';
 
 // Static fallbacks for zero-delay instant render and offline resilience
 const ARG_PROVINCES = [
@@ -48,10 +49,37 @@ export const GeorefFields: React.FC<GeorefFieldsProps> = ({
   labelClassName,
   inputClassName
 }) => {
+  const { clients } = useCRM();
+
   const [provinces, setProvinces] = useState<string[]>(ARG_PROVINCES);
   const [localities, setLocalities] = useState<string[]>([]);
   const [isLoadingProvinces, setIsLoadingProvinces] = useState(false);
   const [isLoadingLocalities, setIsLoadingLocalities] = useState(false);
+
+  const frequentProvinces = useMemo(() => {
+    const counts: Record<string, number> = {};
+    clients.forEach(c => {
+      if (c.provincia) counts[c.provincia] = (counts[c.provincia] || 0) + 1;
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, count }));
+  }, [clients]);
+
+  const frequentLocalities = useMemo(() => {
+    if (!provinciaValue) return [];
+    const counts: Record<string, number> = {};
+    clients.forEach(c => {
+      if (c.provincia === provinciaValue && c.localidad) {
+        counts[c.localidad] = (counts[c.localidad] || 0) + 1;
+      }
+    });
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, count }));
+  }, [clients, provinciaValue]);
 
   // Filter and dropdown states
   const [provQuery, setProvQuery] = useState(provinciaValue);
@@ -215,7 +243,7 @@ export const GeorefFields: React.FC<GeorefFieldsProps> = ({
 
         {/* Dropdown list */}
         {isProvOpen && (
-          <div className="absolute z-[60] left-0 right-0 top-full mt-1.5 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 text-xs animate-scale-up animate-duration-150">
+          <div className="absolute z-[60] left-0 right-0 top-full mt-1.5 max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 text-xs animate-scale-up animate-duration-150">
             {filteredProvinces.length === 0 ? (
               <div
                 className="p-3 text-slate-400 italic text-center cursor-pointer hover:bg-slate-50"
@@ -227,25 +255,56 @@ export const GeorefFields: React.FC<GeorefFieldsProps> = ({
                 Usar "{provQuery}"
               </div>
             ) : (
-              filteredProvinces.map((prov) => (
-                <button
-                  key={prov}
-                  type="button"
-                  onClick={() => {
-                    setProvQuery(prov);
-                    setProvinciaValue(prov);
-                    setLocalQuery('');
-                    setLocalidadValue('');
-                    setIsProvOpen(false);
-                    setIsLocalOpen(true); // Open locality next automatically
-                  }}
-                  className={`w-full text-left px-3 py-2 cursor-pointer transition ${
-                    provinciaValue === prov ? 'bg-indigo-50 text-indigo-900 font-semibold' : 'hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  {prov}
-                </button>
-              ))
+              <>
+                {!provQuery && frequentProvinces.length > 0 && (
+                  <>
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      Frecuentes
+                    </div>
+                    {frequentProvinces.map(({ name, count }) => (
+                      <button
+                        key={`freq-${name}`}
+                        type="button"
+                        onClick={() => {
+                          setProvQuery(name);
+                          setProvinciaValue(name);
+                          setLocalQuery('');
+                          setLocalidadValue('');
+                          setIsProvOpen(false);
+                          setIsLocalOpen(true);
+                        }}
+                        className={`w-full text-left px-3 py-2 cursor-pointer transition flex items-center justify-between ${
+                          provinciaValue === name ? 'bg-indigo-50 text-indigo-900 font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <span>{name}</span>
+                        <span className="text-[10px] text-slate-400 font-medium">{count}</span>
+                      </button>
+                    ))}
+                    <div className="border-t border-slate-100 my-1" />
+                  </>
+                )}
+                {filteredProvinces.map((prov) => (
+                  <button
+                    key={prov}
+                    type="button"
+                    onClick={() => {
+                      setProvQuery(prov);
+                      setProvinciaValue(prov);
+                      setLocalQuery('');
+                      setLocalidadValue('');
+                      setIsProvOpen(false);
+                      setIsLocalOpen(true);
+                    }}
+                    className={`w-full text-left px-3 py-2 cursor-pointer transition ${
+                      provinciaValue === prov ? 'bg-indigo-50 text-indigo-900 font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    {prov}
+                  </button>
+                ))}
+              </>
             )}
           </div>
         )}
@@ -295,8 +354,8 @@ export const GeorefFields: React.FC<GeorefFieldsProps> = ({
 
         {/* Dropdown list */}
         {isLocalOpen && provinciaValue && (
-          <div className="absolute z-[60] left-0 right-0 top-full mt-1.5 max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 text-xs animate-scale-up animate-duration-150">
-            {filteredLocalities.length === 0 ? (
+          <div className="absolute z-[60] left-0 right-0 top-full mt-1.5 max-h-56 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg py-1.5 text-xs animate-scale-up animate-duration-150">
+            {filteredLocalities.length === 0 && !frequentLocalities.length ? (
               <div
                 className="p-3 text-slate-400 italic text-center cursor-pointer hover:bg-slate-50"
                 onClick={() => {
@@ -307,22 +366,62 @@ export const GeorefFields: React.FC<GeorefFieldsProps> = ({
                 {localQuery ? `Usar "${localQuery}"` : 'Escriba para añadir localidad'}
               </div>
             ) : (
-              filteredLocalities.map((loc) => (
-                <button
-                  key={loc}
-                  type="button"
-                  onClick={() => {
-                    setLocalQuery(loc);
-                    setLocalidadValue(loc);
-                    setIsLocalOpen(false);
-                  }}
-                  className={`w-full text-left px-3 py-2 cursor-pointer transition ${
-                    localidadValue === loc ? 'bg-indigo-50 text-indigo-900 font-semibold' : 'hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  {loc}
-                </button>
-              ))
+              <>
+                {!localQuery && frequentLocalities.length > 0 && (
+                  <>
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      Frecuentes
+                    </div>
+                    {frequentLocalities.map(({ name, count }) => (
+                      <button
+                        key={`freq-${name}`}
+                        type="button"
+                        onClick={() => {
+                          setLocalQuery(name);
+                          setLocalidadValue(name);
+                          setIsLocalOpen(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 cursor-pointer transition flex items-center justify-between ${
+                          localidadValue === name ? 'bg-indigo-50 text-indigo-900 font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <span>{name}</span>
+                        <span className="text-[10px] text-slate-400 font-medium">{count}</span>
+                      </button>
+                    ))}
+                    <div className="border-t border-slate-100 my-1" />
+                  </>
+                )}
+                {filteredLocalities.length === 0 ? (
+                  <div
+                    className="p-3 text-slate-400 italic text-center cursor-pointer hover:bg-slate-50"
+                    onClick={() => {
+                      setLocalidadValue(localQuery);
+                      setIsLocalOpen(false);
+                    }}
+                  >
+                    {localQuery ? `Usar "${localQuery}"` : 'Escriba para añadir localidad'}
+                  </div>
+                ) : (
+                  filteredLocalities.map((loc) => (
+                    <button
+                      key={loc}
+                      type="button"
+                      onClick={() => {
+                        setLocalQuery(loc);
+                        setLocalidadValue(loc);
+                        setIsLocalOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 cursor-pointer transition ${
+                        localidadValue === loc ? 'bg-indigo-50 text-indigo-900 font-semibold' : 'hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {loc}
+                    </button>
+                  ))
+                )}
+              </>
             )}
           </div>
         )}
