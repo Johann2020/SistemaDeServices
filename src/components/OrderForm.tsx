@@ -68,7 +68,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
   const [newClientComments, setNewClientComments] = useState('');
 
   // Form states for the Device / Maintenance order
-  const [deviceType, setDeviceType] = useState('Teléfono');
+  const [deviceType, setDeviceType] = useState('Celular');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
@@ -149,7 +149,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
       const key = `${o.deviceType || ''}|${o.brand || ''}|${o.model || ''}|${o.serialNumber || ''}`.toLowerCase().trim();
       if (!uniqueMap.has(key)) {
         uniqueMap.set(key, {
-          deviceType: o.deviceType || 'Teléfono',
+          deviceType: o.deviceType || 'Celular',
           brand: o.brand || '',
           model: o.model || '',
           serialNumber: o.serialNumber || '',
@@ -169,7 +169,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
         setUseExistingDevice(true);
         setSelectedDeviceIndex(0);
         const firstDev = clientOrders[0];
-        setDeviceType(firstDev.deviceType || 'Teléfono');
+        setDeviceType(firstDev.deviceType || 'Celular');
         setBrand(firstDev.brand || '');
         setModel(firstDev.model || '');
         setSerialNumber(firstDev.serialNumber || '');
@@ -178,7 +178,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
       } else {
         setUseExistingDevice(false);
         setSelectedDeviceIndex(null);
-        setDeviceType('Teléfono');
+        setDeviceType('Celular');
         setBrand('');
         setModel('');
         setSerialNumber('');
@@ -188,7 +188,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
     } else {
       setUseExistingDevice(false);
       setSelectedDeviceIndex(null);
-      setDeviceType('Teléfono');
+      setDeviceType('Celular');
       setBrand('');
       setModel('');
       setSerialNumber('');
@@ -228,7 +228,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
     setNewClientAddress('');
     setNewClientComments('');
     
-    setDeviceType('Teléfono');
+    setDeviceType('Celular');
     setBrand('');
     setModel('');
     setSerialNumber('');
@@ -318,8 +318,8 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
         assignedTechnician,
         laborCost: Number(laborCost) || 0,
         estimatedDelivery,
-        devicePassword: (deviceType === 'Notebook' || deviceType === 'Teléfono' || deviceType === 'Tablet' || deviceType === 'CPU / PC Desktop') ? devicePassword : '',
-        devicePattern: (deviceType === 'Teléfono' || deviceType === 'Tablet') ? devicePattern : ''
+        devicePassword: (deviceType === 'Notebook' || deviceType === 'Celular' || deviceType === 'Tablet' || deviceType === 'CPU / PC Desktop') ? devicePassword : '',
+        devicePattern: (deviceType === 'Celular' || deviceType === 'Tablet') ? devicePattern : ''
       });
 
       // Show congratulations detail sheet
@@ -515,7 +515,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
                     onClick={() => {
                       setUseExistingDevice(false);
                       setSelectedDeviceIndex(null);
-                      setDeviceType('Teléfono');
+                      setDeviceType('Celular');
                       setBrand('');
                       setModel('');
                       setSerialNumber('');
@@ -710,7 +710,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
             </div>
 
             {/* Security Fields (Password/PIN and Pattern unlock) */}
-            {(deviceType === 'Notebook' || deviceType === 'Teléfono' || deviceType === 'Tablet' || deviceType === 'CPU / PC Desktop') && (
+            {(deviceType === 'Notebook' || deviceType === 'Celular' || deviceType === 'Tablet' || deviceType === 'CPU / PC Desktop') && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/55 p-4 rounded-xl border border-slate-200 animate-fade-in font-semibold text-xs">
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-slate-700 flex items-center space-x-1.5">
@@ -730,7 +730,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
                   </p>
                 </div>
 
-                {(deviceType === 'Teléfono' || deviceType === 'Tablet') ? (
+                {(deviceType === 'Celular' || deviceType === 'Tablet') ? (
                   <div className="space-y-1">
                     <PatternLockInput
                       value={devicePattern}

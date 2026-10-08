@@ -1,6 +1,6 @@
 export const DEVICE_TYPES = [
   'Notebook',
-  'Teléfono',
+  'Celular',
   'Tablet',
   'CPU / PC Desktop',
   'Televisor / Monitor',
@@ -14,6 +14,5 @@ export const DEVICE_TYPES = [
   'Cafetera',
   'Licuadora / Procesadora',
   'Cámara Fotográfica',
-  'Celular',
   'Otro'
 ];

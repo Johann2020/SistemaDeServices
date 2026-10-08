@@ -177,6 +177,32 @@ function getTenantDb(tenantId) {
     db.exec("ALTER TABLE orders ADD COLUMN workPerformed TEXT DEFAULT ''");
   }
 
+  // Migrate 'Teléfono' → 'Celular' (duplicate category removed)
+  db.exec("UPDATE orders SET deviceType = 'Celular' WHERE deviceType = 'Teléfono'");
+  db.exec("UPDATE budgets SET deviceType = 'Celular' WHERE deviceType = 'Teléfono'");
+
+  // Clean 'Teléfono' from persisted device-type settings
+  const dtRow = db.prepare("SELECT value FROM settings WHERE key = 'allDeviceTypes'").get();
+  if (dtRow) {
+    try {
+      const arr = JSON.parse(dtRow.value);
+      if (arr.includes('Teléfono')) {
+        const cleaned = arr.filter(t => t !== 'Teléfono');
+        db.prepare("UPDATE settings SET value = ? WHERE key = 'allDeviceTypes'").run(JSON.stringify(cleaned));
+      }
+    } catch (_) {}
+  }
+  const adtRow = db.prepare("SELECT value FROM settings WHERE key = 'activeDeviceTypes'").get();
+  if (adtRow) {
+    try {
+      const arr = JSON.parse(adtRow.value);
+      if (arr.includes('Teléfono')) {
+        const cleaned = arr.filter(t => t !== 'Teléfono');
+        db.prepare("UPDATE settings SET value = ? WHERE key = 'activeDeviceTypes'").run(JSON.stringify(cleaned));
+      }
+    } catch (_) {}
+  }
+
   dbCache.set(tenantId, db);
   return db;
 }

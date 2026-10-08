@@ -107,7 +107,7 @@ const CRMContext = createContext<CRMContextType | undefined>(undefined);
 const normalizeDeviceType = (type: string): string => {
   const t = (type || '').trim().toLowerCase();
   if (t === 'laptop') return 'Notebook';
-  if (t === 'smartphone' || t === 'celular' || t === 'telefono') return 'Teléfono';
+  if (t === 'smartphone' || t === 'telefono' || t === 'teléfono' || t === 'celular') return 'Celular';
   if (t === 'pc' || t === 'desktop') return 'CPU / PC Desktop';
   if (t === 'consola') return 'Consola de Videojuegos';
   if (t === 'tablet') return 'Tablet';

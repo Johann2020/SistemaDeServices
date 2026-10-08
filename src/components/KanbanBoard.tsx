@@ -612,11 +612,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
     const isSecDevice =
       editDeviceType === "Notebook" ||
-      editDeviceType === "Teléfono" ||
+      editDeviceType === "Celular" ||
       editDeviceType === "Tablet" ||
       editDeviceType === "CPU / PC Desktop";
     const isTouchDevice =
-      editDeviceType === "Teléfono" || editDeviceType === "Tablet";
+      editDeviceType === "Celular" || editDeviceType === "Tablet";
 
     const finalPassword = isSecDevice ? editDevicePassword : "";
     const finalPattern = isTouchDevice ? editDevicePattern : "";
@@ -2127,7 +2127,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
                       {/* Security credentials in Edit mode */}
                       {(editDeviceType === "Notebook" ||
-                        editDeviceType === "Teléfono" ||
+                        editDeviceType === "Celular" ||
                         editDeviceType === "Tablet" ||
                         editDeviceType === "CPU / PC Desktop") && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-slate-100/60 p-3 rounded-lg border border-slate-200/50 mt-1">
@@ -2147,7 +2147,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             />
                           </div>
 
-                          {editDeviceType === "Teléfono" ||
+                          {editDeviceType === "Celular" ||
                           editDeviceType === "Tablet" ? (
                             <div className="space-y-1">
                               <PatternLockInput
