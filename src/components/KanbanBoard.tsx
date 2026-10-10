@@ -156,6 +156,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [paymentDropdownOrderId, setPaymentDropdownOrderId] = useState<string | null>(null);
   const [priorityDropdownOrderId, setPriorityDropdownOrderId] = useState<string | null>(null);
   const [dropdownPos, setDropdownPos] = useState<{ x: number; y: number; above: boolean }>({ x: 0, y: 0, above: false });
+  const [partialAmountInput, setPartialAmountInput] = useState<string>("");
+  const [showPartialInput, setShowPartialInput] = useState(false);
 
   // New floating service intake modal
   const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
@@ -1418,6 +1420,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                       setDropdownPos({ x: rect.left, y: above ? rect.top : rect.bottom + 4, above });
                                       setPaymentDropdownOrderId(paymentDropdownOrderId === order.id ? null : order.id);
                                       setPriorityDropdownOrderId(null);
+                                      setShowPartialInput(false);
+                                      setPartialAmountInput(String(order.amountPaid || 0));
                                     }}
                                     className={`text-[9px] font-bold px-1.5 rounded cursor-pointer transition hover:opacity-80 h-5 inline-flex items-center ${
                                       (order.paymentStatus || "Pendiente") === "Pagado"
@@ -4017,20 +4021,28 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         </div>,
         document.body
       )}
-      {paymentDropdownOrderId && createPortal(
-        <div
-          className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[110px]"
-          style={{ left: dropdownPos.x, ...(dropdownPos.above ? { bottom: window.innerHeight - dropdownPos.y + 4 } : { top: dropdownPos.y }) }}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {(["Pendiente", "Parcial", "Pagado"] as const).map(ps => {
-            const targetOrder = orders.find(o => o.id === paymentDropdownOrderId);
-            return (
+      {paymentDropdownOrderId && (() => {
+        const targetOrder = orders.find(o => o.id === paymentDropdownOrderId);
+        return createPortal(
+          <div
+            className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[110px]"
+            style={{ left: dropdownPos.x, ...(dropdownPos.above ? { bottom: window.innerHeight - dropdownPos.y + 4 } : { top: dropdownPos.y }) }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(["Pendiente", "Parcial", "Pagado"] as const).map(ps => (
               <button
                 key={ps}
                 type="button"
                 onClick={() => {
-                  updateOrderDetails(paymentDropdownOrderId, { paymentStatus: ps });
+                  if (ps === "Parcial") {
+                    setShowPartialInput(true);
+                    return;
+                  }
+                  updateOrderDetails(paymentDropdownOrderId, {
+                    paymentStatus: ps,
+                    ...(ps === "Pagado" ? { amountPaid: targetOrder?.totalCost || 0 } : {}),
+                    ...(ps === "Pendiente" ? { amountPaid: 0 } : {}),
+                  });
                   setPaymentDropdownOrderId(null);
                 }}
                 className={`w-full text-left px-3 py-1.5 text-[11px] font-semibold transition ${
@@ -4042,11 +4054,52 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 }`} />
                 {ps === "Pendiente" ? "No pagado" : ps}
               </button>
-            );
-          })}
-        </div>,
-        document.body
-      )}
+            ))}
+            {showPartialInput && (
+              <div className="px-2.5 py-2 border-t border-slate-100 space-y-1.5">
+                <label className="text-[10px] font-semibold text-slate-500 block">
+                  Monto abonado {targetOrder?.totalCost ? `(de $${targetOrder.totalCost.toLocaleString("es-AR")})` : ""}
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] text-slate-400 font-bold">$</span>
+                  <input
+                    type="number"
+                    autoFocus
+                    min={0}
+                    max={targetOrder?.totalCost || undefined}
+                    value={partialAmountInput}
+                    onChange={(e) => setPartialAmountInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        updateOrderDetails(paymentDropdownOrderId, {
+                          paymentStatus: "Parcial",
+                          amountPaid: parseFloat(partialAmountInput) || 0,
+                        });
+                        setPaymentDropdownOrderId(null);
+                      }
+                    }}
+                    className="w-full text-xs p-1.5 border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-amber-400 bg-slate-50 font-medium"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      updateOrderDetails(paymentDropdownOrderId, {
+                        paymentStatus: "Parcial",
+                        amountPaid: parseFloat(partialAmountInput) || 0,
+                      });
+                      setPaymentDropdownOrderId(null);
+                    }}
+                    className="bg-amber-500 hover:bg-amber-600 text-white text-[10px] font-bold px-2.5 py-1.5 rounded transition shrink-0"
+                  >
+                    OK
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>,
+          document.body
+        );
+      })()}
     </div>
   );
 };
