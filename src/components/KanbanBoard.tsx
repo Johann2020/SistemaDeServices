@@ -153,6 +153,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     useState<Order | null>(null);
   const [showDeleteTicketConfirm, setShowDeleteTicketConfirm] = useState(false);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
+  const [paymentDropdownOrderId, setPaymentDropdownOrderId] = useState<string | null>(null);
 
   // New floating service intake modal
   const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
@@ -166,6 +167,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       }
     }
   }, [openNewOrderModal, setOpenNewOrderModal]);
+
+  useEffect(() => {
+    if (!paymentDropdownOrderId) return;
+    const handler = () => setPaymentDropdownOrderId(null);
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, [paymentDropdownOrderId]);
 
   // Delay Config panel states
   const [showDelayConfigPanel, setShowDelayConfigPanel] = useState(false);
@@ -1366,22 +1374,77 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                         ) : !isExpanded ? (
                           /* Collapsed State */
                           <div
-                            onClick={() => toggleCardExpansion(order.id)}
                             className="flex flex-col space-y-2"
                           >
-                            <div className="flex justify-between items-start gap-1.5">
-                              <div className="flex items-center space-x-1.5 text-slate-800 font-bold text-sm min-w-0 flex-1">
-                                {getDeviceIcon(order.deviceType)}
-                                <span className="truncate">
-                                  {order.deviceType} {order.brand} {order.model}
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-1 shrink-0">
+                            <div
+                              onClick={() => toggleCardExpansion(order.id)}
+                              className="flex items-center space-x-1.5 text-slate-800 font-bold text-sm min-w-0"
+                              title={`${order.deviceType} ${order.brand} ${order.model}`}
+                            >
+                              {getDeviceIcon(order.deviceType)}
+                              <span className="truncate">
+                                {order.deviceType} {order.brand} {order.model}
+                              </span>
+                              <ChevronDown className="h-4 w-4 text-slate-400 group-hover:text-slate-600 transition shrink-0 ml-auto" />
+                            </div>
+                            <div className="flex items-center justify-between" onClick={() => toggleCardExpansion(order.id)}>
+                              <p className="text-xs text-slate-500 font-medium truncate">
+                                Cliente: {order.clientName}
+                              </p>
+                            </div>
+                            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                              <div className="flex items-center space-x-1">
                                 <span
                                   className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${getPriorityStyle(order.priority)}`}
                                 >
                                   {order.priority}
                                 </span>
+                                {order.totalCost > 0 && (
+                                  <div className="relative">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setPaymentDropdownOrderId(paymentDropdownOrderId === order.id ? null : order.id);
+                                      }}
+                                      className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full cursor-pointer transition hover:opacity-80 ${
+                                        (order.paymentStatus || "Pendiente") === "Pagado"
+                                          ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                                          : (order.paymentStatus || "Pendiente") === "Parcial"
+                                          ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                          : "bg-rose-100 text-rose-700 border border-rose-200"
+                                      }`}
+                                    >
+                                      {(order.paymentStatus || "Pendiente") === "Pagado" ? "Pagado" : (order.paymentStatus || "Pendiente") === "Parcial" ? "Parcial" : "No pagado"}
+                                    </button>
+                                    {paymentDropdownOrderId === order.id && (
+                                      <div className="absolute z-[70] left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[100px]">
+                                        {(["Pendiente", "Parcial", "Pagado"] as const).map(ps => (
+                                          <button
+                                            key={ps}
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              updateOrderDetails(order.id, { paymentStatus: ps });
+                                              setPaymentDropdownOrderId(null);
+                                            }}
+                                            className={`w-full text-left px-3 py-1.5 text-[11px] font-semibold transition ${
+                                              (order.paymentStatus || "Pendiente") === ps
+                                                ? "bg-slate-100 text-slate-800"
+                                                : "hover:bg-slate-50 text-slate-600"
+                                            }`}
+                                          >
+                                            <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                              ps === "Pagado" ? "bg-emerald-500" : ps === "Parcial" ? "bg-amber-500" : "bg-rose-500"
+                                            }`} />
+                                            {ps === "Pendiente" ? "No pagado" : ps}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center space-x-0.5">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1402,24 +1465,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </button>
-                                <ChevronDown className="h-4 w-4 text-slate-400 group-hover:text-slate-600 transition" />
                               </div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <p className="text-xs text-slate-500 font-medium truncate">
-                                Cliente: {order.clientName}
-                              </p>
-                              {order.totalCost > 0 && (
-                                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ml-1 ${
-                                  (order.paymentStatus || "Pendiente") === "Pagado"
-                                    ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                                    : (order.paymentStatus || "Pendiente") === "Parcial"
-                                    ? "bg-amber-100 text-amber-700 border border-amber-200"
-                                    : "bg-rose-100 text-rose-700 border border-rose-200"
-                                }`}>
-                                  {(order.paymentStatus || "Pendiente") === "Pagado" ? "Pagado" : (order.paymentStatus || "Pendiente") === "Parcial" ? "Parcial" : "No pagado"}
-                                </span>
-                              )}
                             </div>
                           </div>
                         ) : (
