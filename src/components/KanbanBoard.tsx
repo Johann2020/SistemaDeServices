@@ -1392,10 +1392,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                 Cliente: {order.clientName}
                               </p>
                             </div>
-                            <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                              <div className="flex items-center space-x-1">
+                            <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
+                              <div className="flex items-center gap-1.5">
                                 <span
-                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${getPriorityStyle(order.priority)}`}
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded leading-none ${getPriorityStyle(order.priority)}`}
                                 >
                                   {order.priority}
                                 </span>
@@ -1417,7 +1417,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                       {(order.paymentStatus || "Pendiente") === "Pagado" ? "Pagado" : (order.paymentStatus || "Pendiente") === "Parcial" ? "Parcial" : "No pagado"}
                                     </button>
                                     {paymentDropdownOrderId === order.id && (
-                                      <div className="absolute z-[70] left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[100px]">
+                                      <div className="absolute z-[70] left-0 bottom-full mb-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[100px]">
                                         {(["Pendiente", "Parcial", "Pagado"] as const).map(ps => (
                                           <button
                                             key={ps}
@@ -1444,7 +1444,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                   </div>
                                 )}
                               </div>
-                              <div className="flex items-center space-x-0.5">
+                              <div className="flex items-center gap-0.5">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
