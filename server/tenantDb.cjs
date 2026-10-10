@@ -205,6 +205,22 @@ function getTenantDb(tenantId) {
     }
   }
 
+  // Migrate legacy workPerformed → diagnosticNotes for orders without laborItems
+  const legacyOrders = db.prepare(
+    `SELECT id, diagnosticNotes, workPerformed FROM orders
+     WHERE workPerformed != '' AND workPerformed IS NOT NULL
+       AND id NOT IN (SELECT DISTINCT orderId FROM order_labor_items)`
+  ).all();
+  if (legacyOrders.length > 0) {
+    const upd = db.prepare('UPDATE orders SET diagnosticNotes = ?, workPerformed = ? WHERE id = ?');
+    for (const o of legacyOrders) {
+      const merged = o.diagnosticNotes
+        ? o.diagnosticNotes + '\n\nTrabajos realizados:\n' + o.workPerformed
+        : 'Trabajos realizados:\n' + o.workPerformed;
+      upd.run(merged, '', o.id);
+    }
+  }
+
   dbCache.set(tenantId, db);
   return db;
 }

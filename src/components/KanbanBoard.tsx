@@ -286,7 +286,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
     const trabajosRealizados = order.laborItems && order.laborItems.length > 0
       ? `\n\n*Trabajos realizados:*\n` + order.laborItems.map(li => `• ${li.name} - $${li.price.toLocaleString("es-AR")}`).join("\n")
-      : order.workPerformed ? `\n\n*Trabajos realizados:* ${order.workPerformed}` : "";
+      : "";
 
     const infoManoObraListo = order.laborCost
       ? `\n*Mano de obra:* $${order.laborCost.toLocaleString("es-AR")}`
@@ -307,7 +307,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       .replace(/{ticket}/g, order.id)
       .replace(/{problema}/g, order.reportedProblem || order.description || "Pendiente de diagnóstico")
       .replace(/{trabajos_realizados}/g, trabajosRealizados)
-      .replace(/{trabajo_realizado}/g, order.laborItems && order.laborItems.length > 0 ? order.laborItems.map(li => li.name).join(", ") : order.workPerformed || "")
+      .replace(/{trabajo_realizado}/g, order.laborItems && order.laborItems.length > 0 ? order.laborItems.map(li => li.name).join(", ") : "")
       .replace(/{tecnico}/g, order.assignedTechnician || "Por asignar")
       .replace(/{presupuesto}/g, totalEst)
       .replace(/{mano_obra}/g, laborEst)
@@ -1753,7 +1753,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     let defaultType: "ingreso" | "diagnostico" | "listo" | "entregado" = "ingreso";
                     if (selectedOrderForModal.status === "Listo") defaultType = "listo";
                     else if (selectedOrderForModal.status === "Entregado") defaultType = "entregado";
-                    else if (selectedOrderForModal.diagnosticNotes || selectedOrderForModal.workPerformed || (selectedOrderForModal.laborItems && selectedOrderForModal.laborItems.length > 0) || selectedOrderForModal.totalCost) {
+                    else if (selectedOrderForModal.diagnosticNotes || (selectedOrderForModal.laborItems && selectedOrderForModal.laborItems.length > 0) || selectedOrderForModal.totalCost) {
                       defaultType = "diagnostico";
                     }
 
@@ -3716,7 +3716,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 </div>
               )}
 
-              {selectedOrderForModal.laborItems && selectedOrderForModal.laborItems.length > 0 ? (
+              {selectedOrderForModal.laborItems && selectedOrderForModal.laborItems.length > 0 && (
                 <div className="space-y-0.5">
                   <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
                     TRABAJOS REALIZADOS:
@@ -3730,16 +3730,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     ))}
                   </div>
                 </div>
-              ) : selectedOrderForModal.workPerformed ? (
-                <div className="space-y-0.5">
-                  <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
-                    TRABAJO REALIZADO:
-                  </h4>
-                  <p className="text-slate-810 bg-slate-55 border border-slate-200 rounded-md py-1.5 px-2.5 font-sans whitespace-pre-line text-xs leading-normal">
-                    {selectedOrderForModal.workPerformed}
-                  </p>
-                </div>
-              ) : null}
+              )}
             </div>
 
             {/* Presupuesto Detallado (Costos parciales / total) */}
