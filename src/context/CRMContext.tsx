@@ -793,8 +793,14 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const now = new Date().toISOString();
         const merged = { ...order, ...data, updatedAt: now };
 
-        // Recalculate totalCost if parts or labor cost updated
-        if (data.partsUsed !== undefined || data.laborCost !== undefined) {
+        // Recalculate laborCost from laborItems if provided
+        if (data.laborItems !== undefined) {
+          merged.laborCost = merged.laborItems.reduce((sum, li) => sum + li.price, 0);
+          apiData.laborCost = merged.laborCost;
+        }
+
+        // Recalculate totalCost if parts, laborItems or labor cost updated
+        if (data.partsUsed !== undefined || data.laborCost !== undefined || data.laborItems !== undefined) {
           const partsSum = merged.partsUsed.reduce((sum, p) => sum + (p.price * p.quantity), 0);
           merged.totalCost = Number(merged.laborCost) + partsSum;
           apiData.totalCost = merged.totalCost;

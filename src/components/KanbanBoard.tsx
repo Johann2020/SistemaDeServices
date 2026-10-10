@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useCRM } from "../context/CRMContext";
 import {
@@ -51,6 +51,7 @@ import {
   Check,
   Home,
   FolderOpen,
+  PlusCircle,
 } from "lucide-react";
 
 
@@ -194,6 +195,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [diagnosticsTemp, setDiagnosticsTemp] = useState("");
   const [workPerformedTemp, setWorkPerformedTemp] = useState("");
   const [laborCostTemp, setLaborCostTemp] = useState(0);
+  const [laborItemsTemp, setLaborItemsTemp] = useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [newLaborName, setNewLaborName] = useState("");
+  const [newLaborPrice, setNewLaborPrice] = useState<number>(0);
+  const [isLaborSuggestionOpen, setIsLaborSuggestionOpen] = useState(false);
+  const laborInputRef = useRef<HTMLDivElement>(null);
   const [paymentStatusTemp, setPaymentStatusTemp] = useState<"Pendiente" | "Parcial" | "Pagado">("Pendiente");
   const [amountPaidTemp, setAmountPaidTemp] = useState(0);
 
@@ -464,6 +470,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     setDiagnosticsTemp(order.diagnosticNotes || "");
     setWorkPerformedTemp(order.workPerformed || "");
     setLaborCostTemp(order.laborCost);
+    setLaborItemsTemp(order.laborItems || []);
+    setNewLaborName("");
+    setNewLaborPrice(0);
     setPaymentStatusTemp(order.paymentStatus || "Pendiente");
     setAmountPaidTemp(order.amountPaid || 0);
 
@@ -552,15 +561,17 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const handleApplyTechnicalEdit = () => {
     if (!selectedOrderForModal) return;
 
+    const computedLaborCost = laborItemsTemp.reduce((s, li) => s + li.price, 0);
     const finalPaymentStatus = paymentStatusTemp === "Pagado" ? "Pagado" : paymentStatusTemp === "Parcial" ? "Parcial" : "Pendiente";
     const finalAmountPaid = finalPaymentStatus === "Pendiente" ? 0 : finalPaymentStatus === "Pagado"
-      ? Number(laborCostTemp) + (selectedOrderForModal.partsUsed?.reduce((s, p) => s + p.price * p.quantity, 0) || 0)
+      ? computedLaborCost + (selectedOrderForModal.partsUsed?.reduce((s, p) => s + p.price * p.quantity, 0) || 0)
       : Number(amountPaidTemp);
 
     updateOrderDetails(selectedOrderForModal.id, {
       diagnosticNotes: diagnosticsTemp,
       workPerformed: workPerformedTemp,
-      laborCost: Number(laborCostTemp),
+      laborItems: laborItemsTemp,
+      laborCost: computedLaborCost,
       paymentStatus: finalPaymentStatus,
       amountPaid: finalAmountPaid,
       plannedWork: editPlannedWork,
@@ -577,8 +588,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         ...prev,
         diagnosticNotes: diagnosticsTemp,
         workPerformed: workPerformedTemp,
-        laborCost: Number(laborCostTemp),
-        totalCost: Number(laborCostTemp) + partsSum,
+        laborItems: laborItemsTemp,
+        laborCost: computedLaborCost,
+        totalCost: computedLaborCost + partsSum,
         paymentStatus: finalPaymentStatus,
         amountPaid: finalAmountPaid,
         plannedWork: editPlannedWork,
@@ -837,6 +849,33 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   };
 
   // Helper priorities styling
+  // Labor item suggestions from all orders
+  const laborSuggestions = useMemo(() => {
+    const map: Record<string, { total: number; count: number }> = {};
+    orders.forEach(o => {
+      (o.laborItems || []).forEach(li => {
+        if (!li.name) return;
+        if (!map[li.name]) map[li.name] = { total: 0, count: 0 };
+        map[li.name].total += li.price;
+        map[li.name].count += 1;
+      });
+    });
+    return Object.entries(map)
+      .map(([name, { total, count }]) => ({ name, avgPrice: Math.round(total / count), count }))
+      .sort((a, b) => b.count - a.count);
+  }, [orders]);
+
+  useEffect(() => {
+    if (!isLaborSuggestionOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (laborInputRef.current && !laborInputRef.current.contains(e.target as Node)) {
+        setIsLaborSuggestionOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [isLaborSuggestionOpen]);
+
   const getPriorityStyle = (priority: OrderPriority) => {
     switch (priority) {
       case "Crítica":
@@ -2320,19 +2359,113 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-slate-500 block mb-1">
-                        Costo de Mano de Obra ($ ARS):
+                      <label className="text-xs font-semibold text-slate-500 block mb-2">
+                        Mano de Obra (Items):
                       </label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                        <input
-                          type="number"
-                          value={laborCostTemp}
-                          onChange={(e) =>
-                            setLaborCostTemp(parseFloat(e.target.value) || 0)
-                          }
-                          className="w-full pl-7 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white font-medium"
-                        />
+
+                      {/* Labor items list */}
+                      {laborItemsTemp.length > 0 && (
+                        <div className="space-y-1.5 mb-3">
+                          {laborItemsTemp.map((li) => (
+                            <div key={li.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs">
+                              <div className="min-w-0 flex-1">
+                                <span className="font-semibold text-slate-700 block truncate">{li.name}</span>
+                                <span className="text-slate-400 text-[10px]">${li.price.toLocaleString("es-AR")}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const updated = laborItemsTemp.filter(x => x.id !== li.id);
+                                  setLaborItemsTemp(updated);
+                                  setLaborCostTemp(updated.reduce((s, x) => s + x.price, 0));
+                                }}
+                                className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 p-1 rounded transition shrink-0 ml-1"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ))}
+                          <div className="text-right text-[11px] font-bold text-slate-600 pr-1">
+                            Total: ${laborItemsTemp.reduce((s, li) => s + li.price, 0).toLocaleString("es-AR")}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Add new labor item */}
+                      <div className="bg-white border border-indigo-100 rounded-lg p-2.5 space-y-2" ref={laborInputRef}>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            placeholder="Ej. Reinstalación Windows, Limpieza..."
+                            value={newLaborName}
+                            onFocus={() => { if (laborSuggestions.length > 0) setIsLaborSuggestionOpen(true); }}
+                            onChange={(e) => { setNewLaborName(e.target.value); setIsLaborSuggestionOpen(true); }}
+                            className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white"
+                          />
+                          {isLaborSuggestionOpen && (() => {
+                            const filtered = newLaborName
+                              ? laborSuggestions.filter(s => s.name.toLowerCase().includes(newLaborName.toLowerCase()))
+                              : laborSuggestions;
+                            if (filtered.length === 0) return null;
+                            return (
+                              <div className="absolute z-[60] left-0 right-0 top-full mt-1 max-h-40 overflow-y-auto bg-white border border-slate-200 rounded-lg shadow-lg py-1 text-xs">
+                                {filtered.slice(0, 8).map(({ name, avgPrice, count }) => (
+                                  <button
+                                    key={name}
+                                    type="button"
+                                    onClick={() => {
+                                      setNewLaborName(name);
+                                      setNewLaborPrice(avgPrice);
+                                      setIsLaborSuggestionOpen(false);
+                                    }}
+                                    className="w-full text-left px-3 py-1.5 hover:bg-slate-50 transition flex items-center justify-between"
+                                  >
+                                    <span className="text-slate-700 font-medium truncate">{name}</span>
+                                    <span className="text-slate-400 text-[10px] shrink-0 ml-2">${avgPrice.toLocaleString("es-AR")} ({count})</span>
+                                  </button>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1">
+                            <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                            <input
+                              type="number"
+                              placeholder="Precio"
+                              value={newLaborPrice || ""}
+                              onChange={(e) => setNewLaborPrice(parseFloat(e.target.value) || 0)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && newLaborName && newLaborPrice > 0) {
+                                  const item = { id: crypto.randomUUID(), name: newLaborName, price: newLaborPrice };
+                                  const updated = [...laborItemsTemp, item];
+                                  setLaborItemsTemp(updated);
+                                  setLaborCostTemp(updated.reduce((s, x) => s + x.price, 0));
+                                  setNewLaborName("");
+                                  setNewLaborPrice(0);
+                                }
+                              }}
+                              className="w-full pl-6 pr-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white font-medium"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            disabled={!newLaborName || newLaborPrice <= 0}
+                            onClick={() => {
+                              const item = { id: crypto.randomUUID(), name: newLaborName, price: newLaborPrice };
+                              const updated = [...laborItemsTemp, item];
+                              setLaborItemsTemp(updated);
+                              setLaborCostTemp(updated.reduce((s, x) => s + x.price, 0));
+                              setNewLaborName("");
+                              setNewLaborPrice(0);
+                            }}
+                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition shrink-0 flex items-center gap-1"
+                          >
+                            <PlusCircle className="h-3 w-3" />
+                            Agregar
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -3617,13 +3750,24 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {/* Mano de Obra row */}
-                  <tr>
-                    <td className="py-1 px-2.5 text-slate-700 text-[10.5px]">Mano de Obra (Labor Técnica / Laboratorio)</td>
-                    <td className="py-1 px-2.5 text-center text-slate-600 text-[10.5px]">1</td>
-                    <td className="py-1 px-2.5 text-right text-slate-700 text-[10.5px]">${(selectedOrderForModal.laborCost || 0).toLocaleString('es-AR')}</td>
-                    <td className="py-1 px-2.5 text-right text-slate-900 font-bold text-[10.5px]">${(selectedOrderForModal.laborCost || 0).toLocaleString('es-AR')}</td>
-                  </tr>
+                  {/* Mano de Obra rows */}
+                  {(selectedOrderForModal.laborItems && selectedOrderForModal.laborItems.length > 0) ? (
+                    selectedOrderForModal.laborItems.map((li) => (
+                      <tr key={li.id}>
+                        <td className="py-1 px-2.5 text-slate-700 text-[10.5px]">{li.name}</td>
+                        <td className="py-1 px-2.5 text-center text-slate-600 text-[10.5px]">1</td>
+                        <td className="py-1 px-2.5 text-right text-slate-700 text-[10.5px]">${li.price.toLocaleString('es-AR')}</td>
+                        <td className="py-1 px-2.5 text-right text-slate-900 font-bold text-[10.5px]">${li.price.toLocaleString('es-AR')}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="py-1 px-2.5 text-slate-700 text-[10.5px]">Mano de Obra</td>
+                      <td className="py-1 px-2.5 text-center text-slate-600 text-[10.5px]">1</td>
+                      <td className="py-1 px-2.5 text-right text-slate-700 text-[10.5px]">${(selectedOrderForModal.laborCost || 0).toLocaleString('es-AR')}</td>
+                      <td className="py-1 px-2.5 text-right text-slate-900 font-bold text-[10.5px]">${(selectedOrderForModal.laborCost || 0).toLocaleString('es-AR')}</td>
+                    </tr>
+                  )}
 
                   {/* Spare parts rows */}
                   {selectedOrderForModal.partsUsed && selectedOrderForModal.partsUsed.length > 0 ? (

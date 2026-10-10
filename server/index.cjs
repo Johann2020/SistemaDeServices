@@ -119,6 +119,7 @@ app.post('/api/migrate', express.json({ limit: '50mb' }), (req, res) => {
 
     const migrate = db.transaction(() => {
       db.prepare('DELETE FROM order_parts').run();
+      db.prepare('DELETE FROM order_labor_items').run();
       db.prepare('DELETE FROM order_status_history').run();
       db.prepare('DELETE FROM budget_items').run();
       db.prepare('DELETE FROM orders').run();
@@ -148,6 +149,7 @@ app.post('/api/migrate', express.json({ limit: '50mb' }), (req, res) => {
           if (!order.id) order.id = crypto.randomUUID();
           if (!order.createdAt) order.createdAt = new Date().toISOString();
           const partsUsed = order.partsUsed || [];
+          const laborItems = order.laborItems || [];
           const statusHistory = order.statusHistory || [];
           insert(db, 'orders', {
             id: order.id, clientId: order.clientId || '', clientName: order.clientName || '',
@@ -166,6 +168,11 @@ app.post('/api/migrate', express.json({ limit: '50mb' }), (req, res) => {
             if (!part.id) part.id = crypto.randomUUID();
             db.prepare('INSERT INTO order_parts (id, orderId, name, price, costPrice, quantity) VALUES (?, ?, ?, ?, ?, ?)')
               .run(part.id, order.id, part.name || '', part.price || 0, part.costPrice || 0, part.quantity || 1);
+          }
+          for (const item of laborItems) {
+            if (!item.id) item.id = crypto.randomUUID();
+            db.prepare('INSERT INTO order_labor_items (id, orderId, name, price) VALUES (?, ?, ?, ?)')
+              .run(item.id, order.id, item.name || '', item.price || 0);
           }
           for (const entry of statusHistory) {
             db.prepare('INSERT INTO order_status_history (orderId, status, timestamp) VALUES (?, ?, ?)')

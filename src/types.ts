@@ -44,6 +44,12 @@ export interface OrderPart {
   quantity: number;
 }
 
+export interface LaborItem {
+  id: string;
+  name: string;
+  price: number;
+}
+
 export interface Order {
   id: string; // Ticket number like TS-1001
   clientId: string;
@@ -64,7 +70,8 @@ export interface Order {
   priority: OrderPriority;
   assignedTechnician: string;
   partsUsed: OrderPart[];
-  laborCost: number; // Cost of repair work itself
+  laborItems?: LaborItem[];
+  laborCost: number; // Sum of laborItems prices (or legacy single value)
   totalCost: number; // laborCost + sum(parts.price * parts.quantity)
   estimatedDelivery?: string;
   cancellationReason?: string; // Motivo de cancelación

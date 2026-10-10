@@ -58,6 +58,15 @@ const SCHEMA_SQL = `
     FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
   );
 
+  CREATE TABLE IF NOT EXISTS order_labor_items (
+    id TEXT NOT NULL,
+    orderId TEXT NOT NULL,
+    name TEXT DEFAULT '',
+    price REAL DEFAULT 0,
+    PRIMARY KEY (orderId, id),
+    FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
+  );
+
   CREATE TABLE IF NOT EXISTS order_status_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     orderId TEXT NOT NULL,
@@ -211,7 +220,7 @@ function getById(db, table, id) {
 }
 
 const VALID_TABLES = new Set([
-  'clients', 'orders', 'order_parts', 'order_status_history',
+  'clients', 'orders', 'order_parts', 'order_labor_items', 'order_status_history',
   'inventory', 'technicians', 'budgets', 'budget_items',
   'users', 'settings',
 ]);
