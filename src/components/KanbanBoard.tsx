@@ -1395,7 +1395,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
                               <div className="flex items-center gap-1.5">
                                 <span
-                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded leading-none ${getPriorityStyle(order.priority)}`}
+                                  className={`text-[9px] font-bold px-1.5 rounded h-[18px] inline-flex items-center ${getPriorityStyle(order.priority)}`}
                                 >
                                   {order.priority}
                                 </span>
@@ -1406,7 +1406,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                         e.stopPropagation();
                                         setPaymentDropdownOrderId(paymentDropdownOrderId === order.id ? null : order.id);
                                       }}
-                                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded leading-none cursor-pointer transition hover:opacity-80 ${
+                                      className={`text-[9px] font-bold px-1.5 rounded h-[18px] inline-flex items-center cursor-pointer transition hover:opacity-80 ${
                                         (order.paymentStatus || "Pendiente") === "Pagado"
                                           ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
                                           : (order.paymentStatus || "Pendiente") === "Parcial"
