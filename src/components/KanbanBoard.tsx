@@ -155,6 +155,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [paymentDropdownOrderId, setPaymentDropdownOrderId] = useState<string | null>(null);
   const [priorityDropdownOrderId, setPriorityDropdownOrderId] = useState<string | null>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ x: number; y: number; above: boolean }>({ x: 0, y: 0, above: false });
 
   // New floating service intake modal
   const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
@@ -1395,87 +1396,39 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             </div>
                             <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
                               <div className="flex items-center gap-1.5">
-                                <div className="relative">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    const above = rect.bottom + 120 > window.innerHeight;
+                                    setDropdownPos({ x: rect.left, y: above ? rect.top : rect.bottom + 4, above });
+                                    setPriorityDropdownOrderId(priorityDropdownOrderId === order.id ? null : order.id);
+                                    setPaymentDropdownOrderId(null);
+                                  }}
+                                  className={`text-[9px] font-bold px-1.5 rounded cursor-pointer transition hover:opacity-80 h-5 inline-flex items-center ${getPriorityStyle(order.priority)}`}
+                                >
+                                  {order.priority}
+                                </button>
+                                {order.totalCost > 0 && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      setPriorityDropdownOrderId(priorityDropdownOrderId === order.id ? null : order.id);
-                                      setPaymentDropdownOrderId(null);
+                                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                      const above = rect.bottom + 100 > window.innerHeight;
+                                      setDropdownPos({ x: rect.left, y: above ? rect.top : rect.bottom + 4, above });
+                                      setPaymentDropdownOrderId(paymentDropdownOrderId === order.id ? null : order.id);
+                                      setPriorityDropdownOrderId(null);
                                     }}
-                                    className={`text-[9px] font-bold px-1.5 rounded cursor-pointer transition hover:opacity-80 h-5 inline-flex items-center ${getPriorityStyle(order.priority)}`}
+                                    className={`text-[9px] font-bold px-1.5 rounded cursor-pointer transition hover:opacity-80 h-5 inline-flex items-center ${
+                                      (order.paymentStatus || "Pendiente") === "Pagado"
+                                        ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
+                                        : (order.paymentStatus || "Pendiente") === "Parcial"
+                                        ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                        : "bg-rose-100 text-rose-700 border border-rose-200"
+                                    }`}
                                   >
-                                    {order.priority}
+                                    {(order.paymentStatus || "Pendiente") === "Pagado" ? "Pagado" : (order.paymentStatus || "Pendiente") === "Parcial" ? "Parcial" : "No pagado"}
                                   </button>
-                                  {priorityDropdownOrderId === order.id && (
-                                    <div className="absolute z-[70] left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[100px]">
-                                      {(["Baja", "Media", "Alta", "Crítica"] as const).map(pr => (
-                                        <button
-                                          key={pr}
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            updateOrderDetails(order.id, { priority: pr });
-                                            setPriorityDropdownOrderId(null);
-                                          }}
-                                          className={`w-full text-left px-3 py-1.5 text-[11px] font-semibold transition ${
-                                            order.priority === pr
-                                              ? "bg-slate-100 text-slate-800"
-                                              : "hover:bg-slate-50 text-slate-600"
-                                          }`}
-                                        >
-                                          <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
-                                            pr === "Crítica" ? "bg-rose-500" : pr === "Alta" ? "bg-amber-500" : pr === "Media" ? "bg-blue-500" : "bg-slate-400"
-                                          }`} />
-                                          {pr}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                                {order.totalCost > 0 && (
-                                  <div className="relative">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setPaymentDropdownOrderId(paymentDropdownOrderId === order.id ? null : order.id);
-                                        setPriorityDropdownOrderId(null);
-                                      }}
-                                      className={`text-[9px] font-bold px-1.5 rounded cursor-pointer transition hover:opacity-80 h-5 inline-flex items-center ${
-                                        (order.paymentStatus || "Pendiente") === "Pagado"
-                                          ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
-                                          : (order.paymentStatus || "Pendiente") === "Parcial"
-                                          ? "bg-amber-100 text-amber-700 border border-amber-200"
-                                          : "bg-rose-100 text-rose-700 border border-rose-200"
-                                      }`}
-                                    >
-                                      {(order.paymentStatus || "Pendiente") === "Pagado" ? "Pagado" : (order.paymentStatus || "Pendiente") === "Parcial" ? "Parcial" : "No pagado"}
-                                    </button>
-                                    {paymentDropdownOrderId === order.id && (
-                                      <div className="absolute z-[70] left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[100px]">
-                                        {(["Pendiente", "Parcial", "Pagado"] as const).map(ps => (
-                                          <button
-                                            key={ps}
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              updateOrderDetails(order.id, { paymentStatus: ps });
-                                              setPaymentDropdownOrderId(null);
-                                            }}
-                                            className={`w-full text-left px-3 py-1.5 text-[11px] font-semibold transition ${
-                                              (order.paymentStatus || "Pendiente") === ps
-                                                ? "bg-slate-100 text-slate-800"
-                                                : "hover:bg-slate-50 text-slate-600"
-                                            }`}
-                                          >
-                                            <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
-                                              ps === "Pagado" ? "bg-emerald-500" : ps === "Parcial" ? "bg-amber-500" : "bg-rose-500"
-                                            }`} />
-                                            {ps === "Pendiente" ? "No pagado" : ps}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
                                 )}
                               </div>
                               <div className="flex items-center gap-0.5">
@@ -4033,6 +3986,66 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             )}
           </div>
         </div>
+      )}
+      {priorityDropdownOrderId && createPortal(
+        <div
+          className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[110px]"
+          style={{ left: dropdownPos.x, ...(dropdownPos.above ? { bottom: window.innerHeight - dropdownPos.y + 4 } : { top: dropdownPos.y }) }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {(["Baja", "Media", "Alta", "Crítica"] as const).map(pr => {
+            const targetOrder = orders.find(o => o.id === priorityDropdownOrderId);
+            return (
+              <button
+                key={pr}
+                type="button"
+                onClick={() => {
+                  updateOrderDetails(priorityDropdownOrderId, { priority: pr });
+                  setPriorityDropdownOrderId(null);
+                }}
+                className={`w-full text-left px-3 py-1.5 text-[11px] font-semibold transition ${
+                  targetOrder?.priority === pr ? "bg-slate-100 text-slate-800" : "hover:bg-slate-50 text-slate-600"
+                }`}
+              >
+                <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                  pr === "Crítica" ? "bg-rose-500" : pr === "Alta" ? "bg-amber-500" : pr === "Media" ? "bg-blue-500" : "bg-slate-400"
+                }`} />
+                {pr}
+              </button>
+            );
+          })}
+        </div>,
+        document.body
+      )}
+      {paymentDropdownOrderId && createPortal(
+        <div
+          className="fixed z-[9999] bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[110px]"
+          style={{ left: dropdownPos.x, ...(dropdownPos.above ? { bottom: window.innerHeight - dropdownPos.y + 4 } : { top: dropdownPos.y }) }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {(["Pendiente", "Parcial", "Pagado"] as const).map(ps => {
+            const targetOrder = orders.find(o => o.id === paymentDropdownOrderId);
+            return (
+              <button
+                key={ps}
+                type="button"
+                onClick={() => {
+                  updateOrderDetails(paymentDropdownOrderId, { paymentStatus: ps });
+                  setPaymentDropdownOrderId(null);
+                }}
+                className={`w-full text-left px-3 py-1.5 text-[11px] font-semibold transition ${
+                  (targetOrder?.paymentStatus || "Pendiente") === ps ? "bg-slate-100 text-slate-800" : "hover:bg-slate-50 text-slate-600"
+                }`}
+              >
+                <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                  ps === "Pagado" ? "bg-emerald-500" : ps === "Parcial" ? "bg-amber-500" : "bg-rose-500"
+                }`} />
+                {ps === "Pendiente" ? "No pagado" : ps}
+              </button>
+            );
+          })}
+        </div>,
+        document.body
       )}
     </div>
   );
