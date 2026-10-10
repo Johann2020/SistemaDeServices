@@ -154,6 +154,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [showDeleteTicketConfirm, setShowDeleteTicketConfirm] = useState(false);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [paymentDropdownOrderId, setPaymentDropdownOrderId] = useState<string | null>(null);
+  const [priorityDropdownOrderId, setPriorityDropdownOrderId] = useState<string | null>(null);
 
   // New floating service intake modal
   const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
@@ -169,11 +170,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   }, [openNewOrderModal, setOpenNewOrderModal]);
 
   useEffect(() => {
-    if (!paymentDropdownOrderId) return;
-    const handler = () => setPaymentDropdownOrderId(null);
+    if (!paymentDropdownOrderId && !priorityDropdownOrderId) return;
+    const handler = () => { setPaymentDropdownOrderId(null); setPriorityDropdownOrderId(null); };
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
-  }, [paymentDropdownOrderId]);
+  }, [paymentDropdownOrderId, priorityDropdownOrderId]);
 
   // Delay Config panel states
   const [showDelayConfigPanel, setShowDelayConfigPanel] = useState(false);
@@ -1394,19 +1395,52 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             </div>
                             <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
                               <div className="flex items-center gap-1.5">
-                                <span
-                                  className={`text-[9px] font-bold px-1.5 rounded h-[18px] inline-flex items-center ${getPriorityStyle(order.priority)}`}
-                                >
-                                  {order.priority}
-                                </span>
+                                <div className="relative">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setPriorityDropdownOrderId(priorityDropdownOrderId === order.id ? null : order.id);
+                                      setPaymentDropdownOrderId(null);
+                                    }}
+                                    className={`text-[9px] font-bold px-1.5 rounded cursor-pointer transition hover:opacity-80 h-5 inline-flex items-center ${getPriorityStyle(order.priority)}`}
+                                  >
+                                    {order.priority}
+                                  </button>
+                                  {priorityDropdownOrderId === order.id && (
+                                    <div className="absolute z-[70] left-0 bottom-full mb-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[100px]">
+                                      {(["Baja", "Media", "Alta", "Crítica"] as const).map(pr => (
+                                        <button
+                                          key={pr}
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            updateOrderDetails(order.id, { priority: pr });
+                                            setPriorityDropdownOrderId(null);
+                                          }}
+                                          className={`w-full text-left px-3 py-1.5 text-[11px] font-semibold transition ${
+                                            order.priority === pr
+                                              ? "bg-slate-100 text-slate-800"
+                                              : "hover:bg-slate-50 text-slate-600"
+                                          }`}
+                                        >
+                                          <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                                            pr === "Crítica" ? "bg-rose-500" : pr === "Alta" ? "bg-amber-500" : pr === "Media" ? "bg-blue-500" : "bg-slate-400"
+                                          }`} />
+                                          {pr}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                                 {order.totalCost > 0 && (
                                   <div className="relative">
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         setPaymentDropdownOrderId(paymentDropdownOrderId === order.id ? null : order.id);
+                                        setPriorityDropdownOrderId(null);
                                       }}
-                                      className={`text-[9px] font-bold px-1.5 rounded h-[18px] inline-flex items-center cursor-pointer transition hover:opacity-80 ${
+                                      className={`text-[9px] font-bold px-1.5 rounded cursor-pointer transition hover:opacity-80 h-5 inline-flex items-center ${
                                         (order.paymentStatus || "Pendiente") === "Pagado"
                                           ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
                                           : (order.paymentStatus || "Pendiente") === "Parcial"
