@@ -1406,7 +1406,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                         e.stopPropagation();
                                         setPaymentDropdownOrderId(paymentDropdownOrderId === order.id ? null : order.id);
                                       }}
-                                      className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full cursor-pointer transition hover:opacity-80 ${
+                                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded leading-none cursor-pointer transition hover:opacity-80 ${
                                         (order.paymentStatus || "Pendiente") === "Pagado"
                                           ? "bg-emerald-100 text-emerald-700 border border-emerald-200"
                                           : (order.paymentStatus || "Pendiente") === "Parcial"
