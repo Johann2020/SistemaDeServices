@@ -11,6 +11,7 @@ import { GeorefFields } from "./GeorefFields";
 import { OrderForm } from "./OrderForm";
 import { CustomSelect } from "./CustomSelect";
 import { PatternLockInput } from "./PatternLockInput";
+import { LaborItemManager } from "./LaborItemManager";
 import {
   ChevronRight,
   ChevronLeft,
@@ -52,6 +53,7 @@ import {
   Home,
   FolderOpen,
   PlusCircle,
+  Settings,
 } from "lucide-react";
 
 
@@ -100,6 +102,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     ticketSub,
     ticketTerms,
     activeDeviceTypes,
+    laborItemTemplates,
   } = useCRM();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -193,12 +196,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [selectedPartId, setSelectedPartId] = useState("");
   const [partQuantity, setPartQuantity] = useState(1);
   const [diagnosticsTemp, setDiagnosticsTemp] = useState("");
-  const [workPerformedTemp, setWorkPerformedTemp] = useState("");
   const [laborCostTemp, setLaborCostTemp] = useState(0);
   const [laborItemsTemp, setLaborItemsTemp] = useState<Array<{ id: string; name: string; price: number }>>([]);
   const [newLaborName, setNewLaborName] = useState("");
   const [newLaborPrice, setNewLaborPrice] = useState<number>(0);
   const [isLaborSuggestionOpen, setIsLaborSuggestionOpen] = useState(false);
+  const [isLaborManagerOpen, setIsLaborManagerOpen] = useState(false);
   const laborInputRef = useRef<HTMLDivElement>(null);
   const [paymentStatusTemp, setPaymentStatusTemp] = useState<"Pendiente" | "Parcial" | "Pagado">("Pendiente");
   const [amountPaidTemp, setAmountPaidTemp] = useState(0);
@@ -281,8 +284,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         ? `\n*Repuestos vinculados:*\n` + order.partsUsed.map((p) => `• ${p.name} (x${p.quantity})`).join("\n")
         : "";
 
-    const trabajosRealizados = order.workPerformed
-      ? `\n\n*Trabajos realizados:* ${order.workPerformed}`
+    const trabajosRealizados = order.laborItems && order.laborItems.length > 0
+      ? `\n\n*Trabajos realizados:*\n` + order.laborItems.map(li => `• ${li.name} - $${li.price.toLocaleString("es-AR")}`).join("\n")
       : "";
 
     const infoManoObraListo = order.laborCost
@@ -304,7 +307,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       .replace(/{ticket}/g, order.id)
       .replace(/{problema}/g, order.reportedProblem || order.description || "Pendiente de diagnóstico")
       .replace(/{trabajos_realizados}/g, trabajosRealizados)
-      .replace(/{trabajo_realizado}/g, order.workPerformed || "")
+      .replace(/{trabajo_realizado}/g, order.laborItems && order.laborItems.length > 0 ? order.laborItems.map(li => li.name).join(", ") : "")
       .replace(/{tecnico}/g, order.assignedTechnician || "Por asignar")
       .replace(/{presupuesto}/g, totalEst)
       .replace(/{mano_obra}/g, laborEst)
@@ -468,7 +471,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     setSelectedOrderForModal(orderToOpen);
     setSelectedOrderId(orderToOpen.id);
     setDiagnosticsTemp(order.diagnosticNotes || "");
-    setWorkPerformedTemp(order.workPerformed || "");
     setLaborCostTemp(order.laborCost);
     setLaborItemsTemp(order.laborItems || []);
     setNewLaborName("");
@@ -569,7 +571,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
     updateOrderDetails(selectedOrderForModal.id, {
       diagnosticNotes: diagnosticsTemp,
-      workPerformed: workPerformedTemp,
       laborItems: laborItemsTemp,
       laborCost: computedLaborCost,
       paymentStatus: finalPaymentStatus,
@@ -577,7 +578,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       plannedWork: editPlannedWork,
     });
 
-    // Update local modal data
     setSelectedOrderForModal((prev) => {
       if (!prev) return null;
       const partsSum = prev.partsUsed.reduce(
@@ -587,7 +587,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       return {
         ...prev,
         diagnosticNotes: diagnosticsTemp,
-        workPerformed: workPerformedTemp,
         laborItems: laborItemsTemp,
         laborCost: computedLaborCost,
         totalCost: computedLaborCost + partsSum,
@@ -860,10 +859,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         map[li.name].count += 1;
       });
     });
+    laborItemTemplates.forEach(t => {
+      if (!map[t.name]) map[t.name] = { total: t.price, count: 1 };
+    });
     return Object.entries(map)
       .map(([name, { total, count }]) => ({ name, avgPrice: Math.round(total / count), count }))
       .sort((a, b) => b.count - a.count);
-  }, [orders]);
+  }, [orders, laborItemTemplates]);
 
   useEffect(() => {
     if (!isLaborSuggestionOpen) return;
@@ -1751,7 +1753,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     let defaultType: "ingreso" | "diagnostico" | "listo" | "entregado" = "ingreso";
                     if (selectedOrderForModal.status === "Listo") defaultType = "listo";
                     else if (selectedOrderForModal.status === "Entregado") defaultType = "entregado";
-                    else if (selectedOrderForModal.diagnosticNotes || selectedOrderForModal.workPerformed || selectedOrderForModal.totalCost) {
+                    else if (selectedOrderForModal.diagnosticNotes || (selectedOrderForModal.laborItems && selectedOrderForModal.laborItems.length > 0) || selectedOrderForModal.totalCost) {
                       defaultType = "diagnostico";
                     }
 
@@ -2336,32 +2338,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-slate-500 block mb-1">
-                        Trabajo Realizado:
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={workPerformedTemp}
-                        onChange={(e) => {
-                          setWorkPerformedTemp(e.target.value);
-                          e.target.style.height = "auto";
-                          e.target.style.height = `${e.target.scrollHeight}px`;
-                        }}
-                        ref={(node) => {
-                          if (node) {
-                            node.style.height = "auto";
-                            node.style.height = `${node.scrollHeight}px`;
-                          }
-                        }}
-                        placeholder="Trabajos realizados: limpieza, cambio de piezas, instalaciones..."
-                        className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:bg-white text-slate-800 overflow-hidden resize-none"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-500 block mb-2">
-                        Mano de Obra (Items):
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-semibold text-slate-500">
+                          Mano de Obra (Items):
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setIsLaborManagerOpen(true)}
+                          className="flex items-center gap-1 text-[10px] text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 px-1.5 py-0.5 rounded transition"
+                          title="Gestionar ítems predeterminados"
+                        >
+                          <Settings className="h-3 w-3" />
+                          Gestionar
+                        </button>
+                      </div>
 
                       {/* Labor items list */}
                       {laborItemsTemp.length > 0 && (
@@ -3726,14 +3716,19 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 </div>
               )}
 
-              {selectedOrderForModal.workPerformed && (
+              {selectedOrderForModal.laborItems && selectedOrderForModal.laborItems.length > 0 && (
                 <div className="space-y-0.5">
                   <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">
-                    TRABAJO REALIZADO:
+                    TRABAJOS REALIZADOS:
                   </h4>
-                  <p className="text-slate-810 bg-slate-55 border border-slate-200 rounded-md py-1.5 px-2.5 font-sans whitespace-pre-line text-xs leading-normal">
-                    {selectedOrderForModal.workPerformed}
-                  </p>
+                  <div className="bg-slate-55 border border-slate-200 rounded-md py-1.5 px-2.5 text-xs leading-normal space-y-0.5">
+                    {selectedOrderForModal.laborItems.map(li => (
+                      <div key={li.id} className="flex justify-between text-slate-700">
+                        <span>{li.name}</span>
+                        <span className="text-slate-500 font-medium">${li.price.toLocaleString('es-AR')}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -3952,7 +3947,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       { tag: "{info_mano_obra}", desc: "Detalle Mano Obra" },
                       { tag: "{info_repuestos}", desc: "Repuestos" },
                       { tag: "{notas}", desc: "Diagnóstico" },
-                      { tag: "{trabajo_realizado}", desc: "Trabajo Realizado" },
+                      { tag: "{trabajo_realizado}", desc: "Ítems Mano Obra" },
                       { tag: "{tecnico}", desc: "Técnico" },
                       { tag: "{trabajos_realizados}", desc: "Diagnóstico + Trabajo" },
                       { tag: "{info_mano_obra_listo}", desc: "Mano Obra (Listo)" },
@@ -4244,6 +4239,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           document.body
         );
       })()}
+      <LaborItemManager isOpen={isLaborManagerOpen} onClose={() => setIsLaborManagerOpen(false)} />
     </div>
   );
 };

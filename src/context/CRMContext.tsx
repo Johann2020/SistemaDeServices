@@ -100,6 +100,8 @@ interface CRMContextType {
   activeDeviceTypes: string[];
   addDeviceType: (name: string) => void;
   setActiveDeviceTypes: (types: string[]) => void;
+  laborItemTemplates: Array<{ name: string; price: number }>;
+  setLaborItemTemplates: (items: Array<{ name: string; price: number }>) => void;
 }
 
 const CRMContext = createContext<CRMContextType | undefined>(undefined);
@@ -173,6 +175,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [allDeviceTypes, setAllDeviceTypes] = useState<string[]>([...DEVICE_TYPES]);
   const [activeDeviceTypes, setActiveDeviceTypesState] = useState<string[]>([...DEVICE_TYPES]);
+  const [laborItemTemplates, setLaborItemTemplatesState] = useState<Array<{ name: string; price: number }>>([]);
 
   const [exchangeRate, setExchangeRate] = useState<number>(1050);
   const [categoryMargins, setCategoryMargins] = useState<Record<string, number>>({
@@ -268,6 +271,11 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     api.settings.set('activeDeviceTypes', JSON.stringify(types)).catch(console.error);
   };
 
+  const setLaborItemTemplates = (items: Array<{ name: string; price: number }>) => {
+    setLaborItemTemplatesState(items);
+    api.settings.set('laborItemTemplates', JSON.stringify(items)).catch(console.error);
+  };
+
   // Load data from API when tenantId changes
   useEffect(() => {
     if (!activeUser) return;
@@ -325,6 +333,9 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }
             if (apiSettings.activeDeviceTypes) {
               try { setActiveDeviceTypesState(JSON.parse(apiSettings.activeDeviceTypes)); } catch {}
+            }
+            if (apiSettings.laborItemTemplates) {
+              try { setLaborItemTemplatesState(JSON.parse(apiSettings.laborItemTemplates)); } catch {}
             }
           }
 
@@ -1509,7 +1520,9 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         allDeviceTypes,
         activeDeviceTypes,
         addDeviceType,
-        setActiveDeviceTypes
+        setActiveDeviceTypes,
+        laborItemTemplates,
+        setLaborItemTemplates
       }}
     >
       {children}
