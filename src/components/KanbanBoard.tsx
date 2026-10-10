@@ -1407,7 +1407,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                     {order.priority}
                                   </button>
                                   {priorityDropdownOrderId === order.id && (
-                                    <div className="absolute z-[70] left-0 bottom-full mb-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[100px]">
+                                    <div className="absolute z-[70] left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[100px]">
                                       {(["Baja", "Media", "Alta", "Crítica"] as const).map(pr => (
                                         <button
                                           key={pr}
@@ -1451,7 +1451,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                       {(order.paymentStatus || "Pendiente") === "Pagado" ? "Pagado" : (order.paymentStatus || "Pendiente") === "Parcial" ? "Parcial" : "No pagado"}
                                     </button>
                                     {paymentDropdownOrderId === order.id && (
-                                      <div className="absolute z-[70] left-0 bottom-full mb-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[100px]">
+                                      <div className="absolute z-[70] left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg py-1 min-w-[100px]">
                                         {(["Pendiente", "Parcial", "Pagado"] as const).map(ps => (
                                           <button
                                             key={ps}
