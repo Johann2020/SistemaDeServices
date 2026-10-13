@@ -70,4 +70,15 @@ export const api = {
   },
   migrate: (data: Record<string, unknown>) => request<{ success: boolean }>('/migrate', { method: 'POST', body: JSON.stringify(data) }),
   health: () => request<{ status: string }>('/health'),
+  superadmin: {
+    accounts: () => request<Array<{
+      id: string; email: string; name: string; picture: string;
+      tenantId: string; role: string; createdAt: string;
+      stats: { clients: number; orders: number; inventory: number; technicians: number; budgets: number };
+      loginStats: { total: number; today: number; last7: number; last30: number; lastLogin: string | null };
+    }>>('/superadmin/accounts'),
+    logins: (accountId: string) => request<Array<{ day: string; count: number }>>(`/superadmin/accounts/${accountId}/logins`),
+    switchTenant: (accountId: string) => request<{ user: { id: string; email: string; name: string; tenantId: string; role: string } }>(`/superadmin/switch-tenant/${accountId}`, { method: 'POST' }),
+    returnToAdmin: () => request<{ user: { id: string; email: string; name: string; tenantId: string; role: string } }>('/superadmin/return-to-admin', { method: 'POST' }),
+  },
 };

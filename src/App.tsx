@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { CRMProvider, useCRM } from './context/CRMContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { api } from './api';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { KanbanBoard } from './components/KanbanBoard';
@@ -9,6 +10,7 @@ import { InventoryManager } from './components/InventoryManager';
 import { TechnicianList } from './components/TechnicianList';
 import { HistoryModule } from './components/HistoryModule';
 import { AdminPanel } from './components/AdminPanel';
+import { SuperAdminPanel } from './components/SuperAdminPanel';
 import { BudgetModule } from './components/BudgetModule';
 import { LoginScreen } from './components/LoginScreen';
 import { OrderStatus } from './types';
@@ -22,12 +24,27 @@ import {
   X
 } from 'lucide-react';
 
+const SUPERADMIN_EMAIL = 'gelrothjohann@gmail.com';
+
 function CRMAppContent() {
   const { user } = useAuth();
   const { stats, toasts, removeToast } = useCRM();
 
+  const impersonatingName = (() => {
+    try { return localStorage.getItem('superadmin_impersonating'); } catch { return null; }
+  })();
+  const isImpersonating = !!impersonatingName;
+
+  const handleReturnToAdmin = useCallback(async () => {
+    try {
+      await api.superadmin.returnToAdmin();
+      localStorage.removeItem('superadmin_impersonating');
+      window.location.reload();
+    } catch {}
+  }, []);
+
   const [activeTab, setActiveTab] = useState<string>(
-    user?.role === 'admin' ? 'admin' : 'dashboard'
+    isImpersonating ? 'dashboard' : user?.role === 'admin' ? 'admin' : 'dashboard'
   );
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [activeOrderStatusTab, setActiveOrderStatusTab] = useState<OrderStatus>('Ingresado');
@@ -83,6 +100,8 @@ function CRMAppContent() {
         return <HistoryModule />;
       case 'admin':
         return user?.role === 'admin' ? <AdminPanel /> : <Dashboard setActiveTab={handleSetActiveTab} setSelectedOrderId={setSelectedOrderId} setActiveOrderTab={setActiveOrderStatusTab} />;
+      case 'superadmin':
+        return user?.email === 'gelrothjohann@gmail.com' ? <SuperAdminPanel /> : <Dashboard setActiveTab={handleSetActiveTab} setSelectedOrderId={setSelectedOrderId} setActiveOrderTab={setActiveOrderStatusTab} />;
       default:
         return <Dashboard setActiveTab={handleSetActiveTab} setSelectedOrderId={setSelectedOrderId} setActiveOrderTab={setActiveOrderStatusTab} />;
     }
@@ -98,7 +117,20 @@ function CRMAppContent() {
 
         {/* Main Workspace Frame */}
         <div className="flex-1 flex flex-col h-full overflow-hidden">
-          
+
+          {/* Impersonation banner */}
+          {isImpersonating && (
+            <div className="bg-amber-500 text-white px-4 py-1.5 flex items-center justify-between text-xs font-bold shrink-0 z-50">
+              <span>Viendo CRM de: {impersonatingName}</span>
+              <button
+                onClick={handleReturnToAdmin}
+                className="bg-white/20 hover:bg-white/30 px-3 py-0.5 rounded text-[11px] font-bold transition"
+              >
+                Volver a mi cuenta
+              </button>
+            </div>
+          )}
+
           {/* Core Top bar header */}
           <header id="app-topbar" className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0">
             <div className="flex items-center space-x-1.5 font-sans font-bold text-slate-700 text-xs">

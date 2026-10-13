@@ -7,6 +7,7 @@ import {
   Activity,
   User,
   ShieldCheck,
+  Crown,
   LogOut,
   Undo2,
   FileText
@@ -35,12 +36,21 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     { id: 'history', label: 'Historial', icon: Undo2, badge: null }
   ];
 
-  // If logged user is admin, allow visiting Admin Panel
   if (user?.role === 'admin') {
     menuItems.push({
       id: 'admin',
       label: 'Panel Administrador',
       icon: ShieldCheck,
+      badge: null
+    });
+  }
+
+  const SUPERADMIN_EMAIL = 'gelrothjohann@gmail.com';
+  if (user?.email === SUPERADMIN_EMAIL) {
+    menuItems.push({
+      id: 'superadmin',
+      label: 'Super Admin',
+      icon: Crown,
       badge: null
     });
   }

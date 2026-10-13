@@ -22,6 +22,16 @@ masterDb.exec(`
     role TEXT DEFAULT 'admin',
     createdAt TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS login_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    accountId TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    FOREIGN KEY (accountId) REFERENCES accounts(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_login_events_accountId ON login_events(accountId);
+  CREATE INDEX IF NOT EXISTS idx_login_events_timestamp ON login_events(timestamp);
 `);
 
 function findAccountByGoogleId(googleId) {
@@ -40,4 +50,8 @@ function createAccount(data) {
   return masterDb.prepare('SELECT * FROM accounts WHERE id = ?').get(data.id);
 }
 
-module.exports = { masterDb, findAccountByGoogleId, findAccountByEmail, createAccount, dataDir };
+function recordLogin(accountId) {
+  masterDb.prepare('INSERT INTO login_events (accountId, timestamp) VALUES (?, ?)').run(accountId, new Date().toISOString());
+}
+
+module.exports = { masterDb, findAccountByGoogleId, findAccountByEmail, createAccount, recordLogin, dataDir };

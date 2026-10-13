@@ -5,7 +5,7 @@ const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const { authMiddleware, generateToken, exchangeGoogleCode, findOrCreateFromGoogle } = require('./auth.cjs');
 const { getTenantDb, insert } = require('./tenantDb.cjs');
-const { findAccountByEmail } = require('./masterDb.cjs');
+const { findAccountByEmail, recordLogin, masterDb } = require('./masterDb.cjs');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -37,6 +37,7 @@ app.post('/api/auth/google', authLimiter, async (req, res) => {
     const profile = await exchangeGoogleCode(code, redirectUri);
     const account = findOrCreateFromGoogle(profile);
     const token = generateToken(account);
+    try { recordLogin(account.id); } catch (_) {}
 
     res.cookie('crm_token', token, {
       httpOnly: true,
@@ -107,6 +108,7 @@ app.use('/api/technicians', require('./routes/technicians.cjs'));
 app.use('/api/budgets', require('./routes/budgets.cjs'));
 app.use('/api/users', require('./routes/users.cjs'));
 app.use('/api/settings', require('./routes/settings.cjs'));
+app.use('/api/superadmin', require('./routes/superadmin.cjs'));
 
 // Migration endpoint (admin only, larger body limit)
 app.post('/api/migrate', express.json({ limit: '50mb' }), (req, res) => {

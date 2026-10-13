@@ -55,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(async () => {
     try { await api.auth.logout(); } catch {}
+    try { localStorage.removeItem('superadmin_impersonating'); } catch {}
     setUser(null);
   }, []);
 
