@@ -1629,13 +1629,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                     Tecnico asignado: {order.assignedTechnician}
                                   </span>
                                 </span>
-                                <span className="font-bold text-slate-700">
-                                  {order.totalCost.toLocaleString("es-AR", {
-                                    style: "currency",
-                                    currency: "ARS",
-                                    minimumFractionDigits: 0,
-                                  })}
-                                </span>
                               </div>
 
                             </div>
