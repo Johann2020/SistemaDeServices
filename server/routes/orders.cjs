@@ -12,7 +12,9 @@ function getOrderWithRelations(db, orderId) {
   order.laborCost = order.laborCost || 0;
   order.paymentStatus = order.paymentStatus || 'Pendiente';
   order.amountPaid = order.amountPaid || 0;
-  const laborSum = order.laborItems.reduce((s, li) => s + (li.price || 0), 0);
+  const laborSum = order.laborItems.length > 0
+    ? order.laborItems.reduce((s, li) => s + (li.price || 0), 0)
+    : (order.laborCost || 0);
   const partsSum = order.partsUsed.reduce((s, p) => s + (p.price || 0) * (p.quantity || 1), 0);
   order.totalCost = laborSum + partsSum;
   return order;
@@ -49,7 +51,9 @@ function getAllOrdersWithRelations(db) {
     order.laborCost = order.laborCost || 0;
     order.paymentStatus = order.paymentStatus || 'Pendiente';
     order.amountPaid = order.amountPaid || 0;
-    const laborSum = order.laborItems.reduce((s, li) => s + (li.price || 0), 0);
+    const laborSum = order.laborItems.length > 0
+      ? order.laborItems.reduce((s, li) => s + (li.price || 0), 0)
+      : (order.laborCost || 0);
     const partsSum = order.partsUsed.reduce((s, p) => s + (p.price || 0) * (p.quantity || 1), 0);
     order.totalCost = laborSum + partsSum;
   }
