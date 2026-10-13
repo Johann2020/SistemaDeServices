@@ -10,9 +10,11 @@ function getOrderWithRelations(db, orderId) {
   order.laborItems = db.prepare('SELECT * FROM order_labor_items WHERE orderId = ?').all(orderId);
   order.statusHistory = db.prepare('SELECT status, timestamp FROM order_status_history WHERE orderId = ? ORDER BY id').all(orderId);
   order.laborCost = order.laborCost || 0;
-  order.totalCost = order.totalCost || 0;
   order.paymentStatus = order.paymentStatus || 'Pendiente';
   order.amountPaid = order.amountPaid || 0;
+  const laborSum = order.laborItems.reduce((s, li) => s + (li.price || 0), 0);
+  const partsSum = order.partsUsed.reduce((s, p) => s + (p.price || 0) * (p.quantity || 1), 0);
+  order.totalCost = laborSum + partsSum;
   return order;
 }
 
@@ -45,9 +47,11 @@ function getAllOrdersWithRelations(db) {
     order.laborItems = laborMap[order.id] || [];
     order.statusHistory = historyMap[order.id] || [];
     order.laborCost = order.laborCost || 0;
-    order.totalCost = order.totalCost || 0;
     order.paymentStatus = order.paymentStatus || 'Pendiente';
     order.amountPaid = order.amountPaid || 0;
+    const laborSum = order.laborItems.reduce((s, li) => s + (li.price || 0), 0);
+    const partsSum = order.partsUsed.reduce((s, p) => s + (p.price || 0) * (p.quantity || 1), 0);
+    order.totalCost = laborSum + partsSum;
   }
   return orders;
 }
