@@ -15,7 +15,6 @@ import { BudgetModule } from './components/BudgetModule';
 import { LoginScreen } from './components/LoginScreen';
 import { OrderStatus } from './types';
 import {
-  Bell,
   CalendarClock,
   ShieldCheck,
   CheckCircle2,
@@ -150,16 +149,6 @@ function CRMAppContent() {
                 <CalendarClock className="h-3.5 w-3.5 text-slate-400" />
                 <span>Fecha: {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
               </div>
-
-              {/* Notification alert */}
-              <div className="relative p-1.5 hover:bg-slate-100 transition rounded-lg text-slate-400 hover:text-slate-700 cursor-pointer">
-                <Bell className="h-4.5 w-4.5" />
-                {stats.pendingCount > 0 && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full animate-ping"></span>
-                )}
-              </div>
-
-              <div className="h-5 w-[1px] bg-slate-200"></div>
 
               {/* License verification */}
               <div className="flex items-center space-x-1 px-2.5 py-1 bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 rounded-md text-xs font-bold">
