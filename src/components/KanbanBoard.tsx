@@ -1452,8 +1452,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                 >
                                   {order.priority}
                                 </button>
-                                {order.totalCost > 0 && (
-                                  <button
+                                <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -1474,7 +1473,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                   >
                                     {(order.paymentStatus || "Pendiente") === "Pagado" ? "Pagado" : (order.paymentStatus || "Pendiente") === "Parcial" ? "Parcial" : "No pagado"}
                                   </button>
-                                )}
                               </div>
                               <div className="flex items-center gap-0.5">
                                 <button
