@@ -37,9 +37,11 @@ function CRMAppContent() {
   const handleReturnToAdmin = useCallback(async () => {
     try {
       await api.superadmin.returnToAdmin();
-      localStorage.removeItem('superadmin_impersonating');
-      window.location.reload();
-    } catch {}
+    } catch (err) {
+      console.error('Return to admin failed:', err);
+    }
+    localStorage.removeItem('superadmin_impersonating');
+    window.location.reload();
   }, []);
 
   const [activeTab, setActiveTab] = useState<string>(
@@ -119,11 +121,12 @@ function CRMAppContent() {
 
           {/* Impersonation banner */}
           {isImpersonating && (
-            <div className="bg-amber-500 text-white px-4 py-1.5 flex items-center justify-between text-xs font-bold shrink-0 z-50">
+            <div className="bg-amber-500 text-white px-4 py-2 flex items-center justify-between text-xs font-bold shrink-0 relative" style={{ zIndex: 9999 }}>
               <span>Viendo CRM de: {impersonatingName}</span>
               <button
-                onClick={handleReturnToAdmin}
-                className="bg-white/20 hover:bg-white/30 px-3 py-0.5 rounded text-[11px] font-bold transition"
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleReturnToAdmin(); }}
+                className="bg-white text-amber-700 hover:bg-amber-50 px-4 py-1 rounded-md text-[11px] font-bold transition cursor-pointer select-none shadow-sm"
               >
                 Volver a mi cuenta
               </button>
