@@ -15,6 +15,39 @@ function superadminGuard(req, res, next) {
   next();
 }
 
+// This route must be BEFORE the guard: during impersonation the JWT
+// holds the target's email, so the guard would block it.
+router.post('/return-to-admin', (req, res) => {
+  if (req.user.impersonatedBy !== SUPERADMIN_EMAIL) {
+    return res.status(403).json({ error: 'Acceso denegado' });
+  }
+  try {
+    const admin = masterDb.prepare('SELECT * FROM accounts WHERE email = ?').get(SUPERADMIN_EMAIL);
+    if (!admin) return res.status(404).json({ error: 'Cuenta admin no encontrada' });
+
+    const token = generateToken(admin);
+    res.cookie('crm_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    res.json({
+      user: {
+        id: admin.id,
+        email: admin.email,
+        name: admin.name,
+        picture: admin.picture,
+        tenantId: admin.tenantId,
+        role: admin.role,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Error al retornar' });
+  }
+});
+
 router.use(superadminGuard);
 
 router.get('/accounts', (req, res) => {
@@ -91,12 +124,10 @@ router.post('/switch-tenant/:accountId', (req, res) => {
     const target = masterDb.prepare('SELECT * FROM accounts WHERE id = ?').get(req.params.accountId);
     if (!target) return res.status(404).json({ error: 'Cuenta no encontrada' });
 
-    const token = generateToken({
-      id: target.id,
-      email: target.email,
-      tenantId: target.tenantId,
-      role: target.role,
-    });
+    const token = generateToken(
+      { id: target.id, email: target.email, tenantId: target.tenantId, role: target.role },
+      { impersonatedBy: SUPERADMIN_EMAIL, expiresIn: '2h' }
+    );
 
     res.cookie('crm_token', token, {
       httpOnly: true,
@@ -118,35 +149,6 @@ router.post('/switch-tenant/:accountId', (req, res) => {
   } catch (err) {
     console.error('Switch tenant error:', err.message);
     res.status(500).json({ error: 'Error al cambiar tenant' });
-  }
-});
-
-// Return to superadmin's own session
-router.post('/return-to-admin', (req, res) => {
-  try {
-    const admin = masterDb.prepare('SELECT * FROM accounts WHERE email = ?').get(SUPERADMIN_EMAIL);
-    if (!admin) return res.status(404).json({ error: 'Cuenta admin no encontrada' });
-
-    const token = generateToken(admin);
-    res.cookie('crm_token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-
-    res.json({
-      user: {
-        id: admin.id,
-        email: admin.email,
-        name: admin.name,
-        picture: admin.picture,
-        tenantId: admin.tenantId,
-        role: admin.role,
-      },
-    });
-  } catch (err) {
-    res.status(500).json({ error: 'Error al retornar' });
   }
 });
 

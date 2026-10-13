@@ -9,12 +9,10 @@ const JWT_SECRET = process.env.JWT_SECRET || (() => {
   return 'crm-dev-secret-local-only';
 })();
 
-function generateToken(account) {
-  return jwt.sign(
-    { id: account.id, email: account.email, tenantId: account.tenantId, role: account.role },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+function generateToken(account, opts = {}) {
+  const payload = { id: account.id, email: account.email, tenantId: account.tenantId, role: account.role };
+  if (opts.impersonatedBy) payload.impersonatedBy = opts.impersonatedBy;
+  return jwt.sign(payload, JWT_SECRET, { expiresIn: opts.expiresIn || '7d' });
 }
 
 function verifyToken(token) {
