@@ -466,7 +466,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
                 </button>
               </div>
 
-              <div id="search-client-panel" className="relative space-y-2">
+              <div id="search-client-panel" className="space-y-2">
                 <label className="text-xs font-semibold text-slate-500 block">Buscar cliente por Nombre o Identificación:</label>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -490,19 +490,27 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
                 </div>
 
                 {suggestedClients.length > 0 && (
-                  <div className="absolute z-20 left-0 right-0 mt-1.5 bg-white border border-slate-200 rounded-lg shadow-lg divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                  <div className="mt-2 bg-slate-50/70 border border-slate-200 rounded-xl divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                    <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider sticky top-0 bg-slate-50 border-b border-slate-100 z-10">
+                      {suggestedClients.length} cliente{suggestedClients.length !== 1 ? 's' : ''} encontrado{suggestedClients.length !== 1 ? 's' : ''}
+                    </div>
                     {suggestedClients.map((client) => (
                       <div
                         key={client.id}
                         onClick={() => handleSelectClient(client)}
-                        className="p-3 hover:bg-slate-50 cursor-pointer flex justify-between items-center text-xs transition"
+                        className="px-4 py-3 hover:bg-indigo-50 cursor-pointer flex justify-between items-center text-xs transition"
                       >
-                        <div>
-                          <p className="font-semibold text-slate-800">{client.name}</p>
-                          <p className="text-slate-400 font-medium text-[10.5px]">{client.phone}</p>
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-[11px] font-black shrink-0">
+                            {client.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-800">{client.name}</p>
+                            <p className="text-slate-400 font-medium text-[10.5px]">{client.phone || 'Sin teléfono'}</p>
+                          </div>
                         </div>
-                        <span className="font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded text-[10px] uppercase">
-                          {client.documentId}
+                        <span className="font-mono text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded text-[10px] uppercase shrink-0">
+                          {client.documentId || '—'}
                         </span>
                       </div>
                     ))}
