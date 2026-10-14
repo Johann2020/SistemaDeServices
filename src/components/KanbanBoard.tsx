@@ -155,7 +155,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedOrderForModal, setSelectedOrderForModal] =
     useState<Order | null>(null);
-  const [detailTab, setDetailTab] = useState<'info' | 'diagnostico' | 'costos'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'diagnostico' | 'repuestos' | 'costos'>('info');
   const [showDeleteTicketConfirm, setShowDeleteTicketConfirm] = useState(false);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [paymentDropdownOrderId, setPaymentDropdownOrderId] = useState<string | null>(null);
@@ -1694,7 +1694,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           id="order-details-modal"
           className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex justify-center items-center z-50 p-4 overflow-y-auto"
         >
-          <div className="bg-white rounded-2xl max-w-7xl w-full shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[95vh] md:max-h-[90vh] animate-slide-up">
+          <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[95vh] md:max-h-[90vh] animate-slide-up">
             {/* Unified Top Header Bar */}
             <div className="bg-slate-900 text-white p-4.5 px-5 flex justify-between items-center shrink-0 border-b border-slate-800">
               <div className="flex flex-wrap items-center gap-2.5">
@@ -1782,7 +1782,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               {([
                 { id: 'info' as const, label: 'Información', icon: <User className="h-3.5 w-3.5" /> },
                 { id: 'diagnostico' as const, label: 'Diagnóstico', icon: <FileText className="h-3.5 w-3.5" /> },
-                { id: 'costos' as const, label: 'Costos y Estado', icon: <DollarSign className="h-3.5 w-3.5" /> },
+                { id: 'repuestos' as const, label: 'Repuestos', icon: <Briefcase className="h-3.5 w-3.5" /> },
+                { id: 'costos' as const, label: 'Costos', icon: <DollarSign className="h-3.5 w-3.5" /> },
               ]).map((tab) => (
                 <button
                   key={tab.id}
@@ -1804,7 +1805,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             <div className="flex-1 overflow-y-auto min-h-0 bg-white">
               {/* Tab: Información */}
               {detailTab === 'info' && (
-              <div className="max-w-3xl mx-auto p-5.5 space-y-5 animate-fade-in">
+              <div className="p-5.5 space-y-5 animate-fade-in">
                 {/* Client Info Block */}
                 <div
                   className={`bg-slate-50 border border-slate-200 rounded-xl p-4.5 space-y-3 animate-fade-in ${isEditingClient ? "relative z-20" : "relative z-10"}`}
@@ -2324,7 +2325,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
               {/* Tab: Diagnóstico */}
               {detailTab === 'diagnostico' && (
-              <div className="max-w-3xl mx-auto p-5.5 space-y-5 animate-fade-in">
+              <div className="p-5.5 space-y-5 animate-fade-in">
                 {isEditingDevice && renderTechnicianAssignment()}
 
                 {/* Technician Diagnostic Note Editor */}
@@ -2719,8 +2720,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               )}
 
               {/* Tab: Costos y Estado */}
-              {detailTab === 'costos' && (
-              <div className="max-w-3xl mx-auto p-5.5 animate-fade-in">
+              {detailTab === 'repuestos' && (
+              <div className="p-5.5 animate-fade-in">
                 <div className="space-y-5">
                   <div className="flex justify-between items-center border-b border-slate-200 pb-3">
                     <div className="flex items-center space-x-1.5">
@@ -3347,9 +3348,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     )}
                   </div>
                 </div>
+              </div>
+              )}
 
-                {/* Total Card Block */}
-                <div className="mt-6 pt-4 border-t border-slate-200 space-y-4">
+              {/* Tab: Costos y Estado */}
+              {detailTab === 'costos' && (
+              <div className="p-5.5 animate-fade-in">
+                <div className="space-y-4">
                   <div className="space-y-1.5 text-xs text-slate-600 bg-white/70 p-3 rounded-xl border border-slate-200">
                     <div className="flex justify-between">
                       <span>Mano de obra:</span>
