@@ -69,7 +69,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
   const [newClientComments, setNewClientComments] = useState('');
 
   // Form states for the Device / Maintenance order
-  const [deviceType, setDeviceType] = useState('Celular');
+  const [deviceType, setDeviceType] = useState('');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
@@ -227,7 +227,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
       } else {
         setUseExistingDevice(false);
         setSelectedDeviceIndex(null);
-        setDeviceType('Celular');
+        setDeviceType('');
         setBrand('');
         setModel('');
         setSerialNumber('');
@@ -237,7 +237,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
     } else {
       setUseExistingDevice(false);
       setSelectedDeviceIndex(null);
-      setDeviceType('Celular');
+      setDeviceType('');
       setBrand('');
       setModel('');
       setSerialNumber('');
@@ -277,7 +277,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
     setNewClientAddress('');
     setNewClientComments('');
     
-    setDeviceType('Celular');
+    setDeviceType('');
     setBrand('');
     setModel('');
     setSerialNumber('');
@@ -344,6 +344,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
     const targetClientId = selectedClient.id;
 
     const missing: string[] = [];
+    if (!deviceType) missing.push('Tipo de Dispositivo');
     if (!brand) missing.push('Marca');
     if (!model) missing.push('Modelo');
     if (!reportedProblem && !plannedWork) missing.push('al menos uno de: Problema Reportado o Trabajos a Realizar');
@@ -564,7 +565,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
                     onClick={() => {
                       setUseExistingDevice(false);
                       setSelectedDeviceIndex(null);
-                      setDeviceType('Celular');
+                      setDeviceType('');
                       setBrand('');
                       setModel('');
                       setSerialNumber('');
@@ -683,7 +684,10 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
                   <CustomSelect
                     value={deviceType}
                     onChange={(val) => setDeviceType(val)}
-                    options={activeDeviceTypes.map(type => ({ value: type, label: type }))}
+                    options={[
+                      { value: '', label: 'Seleccione una opción' },
+                      ...activeDeviceTypes.map(type => ({ value: type, label: type }))
+                    ]}
                   />
                 )}
               </div>
