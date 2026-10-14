@@ -155,6 +155,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedOrderForModal, setSelectedOrderForModal] =
     useState<Order | null>(null);
+  const [detailTab, setDetailTab] = useState<'info' | 'diagnostico' | 'costos'>('info');
   const [showDeleteTicketConfirm, setShowDeleteTicketConfirm] = useState(false);
   const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
   const [paymentDropdownOrderId, setPaymentDropdownOrderId] = useState<string | null>(null);
@@ -508,6 +509,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     setEditPlannedWork(order.plannedWork || "");
     setIsEditingDevice(false);
 
+    setDetailTab('info');
     setIsDetailOpen(true);
   };
 
@@ -1775,10 +1777,34 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               </div>
             </div>
 
-            {/* Scrolling Inner Container: Responsive Columns */}
-            <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden min-h-0 bg-white items-stretch">
-              {/* Column 1: Client & Equipment details */}
-              <div className="flex-1 lg:flex-[1.1] min-w-0 p-5.5 border-b lg:border-b-0 lg:border-r border-slate-200 lg:overflow-y-auto space-y-5">
+            {/* Tab Navigation */}
+            <div className="flex border-b border-slate-200 bg-slate-50/60 shrink-0">
+              {([
+                { id: 'info' as const, label: 'Información', icon: <User className="h-3.5 w-3.5" /> },
+                { id: 'diagnostico' as const, label: 'Diagnóstico', icon: <FileText className="h-3.5 w-3.5" /> },
+                { id: 'costos' as const, label: 'Costos y Estado', icon: <DollarSign className="h-3.5 w-3.5" /> },
+              ]).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setDetailTab(tab.id)}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 text-xs font-bold transition-all cursor-pointer select-none
+                    ${detailTab === tab.id
+                      ? 'text-indigo-700 bg-white border-b-2 border-indigo-600'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-white/60'
+                    }`}
+                >
+                  {tab.icon}
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 overflow-y-auto min-h-0 bg-white">
+              {/* Tab: Información */}
+              {detailTab === 'info' && (
+              <div className="max-w-3xl mx-auto p-5.5 space-y-5 animate-fade-in">
                 {/* Client Info Block */}
                 <div
                   className={`bg-slate-50 border border-slate-200 rounded-xl p-4.5 space-y-3 animate-fade-in ${isEditingClient ? "relative z-20" : "relative z-10"}`}
@@ -2294,10 +2320,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 {/* Technician Assignment section */}
                 {!isEditingDevice && renderTechnicianAssignment()}
               </div>
+              )}
 
-              {/* Column 2: Log & Tech Timeline */}
-              <div className="flex-1 lg:flex-[1] min-w-0 p-5.5 border-b lg:border-b-0 lg:border-r border-slate-200 lg:overflow-y-auto space-y-5">
-                {/* Technician Assignment section (moved here when editing device) */}
+              {/* Tab: Diagnóstico */}
+              {detailTab === 'diagnostico' && (
+              <div className="max-w-3xl mx-auto p-5.5 space-y-5 animate-fade-in">
                 {isEditingDevice && renderTechnicianAssignment()}
 
                 {/* Technician Diagnostic Note Editor */}
@@ -2689,9 +2716,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   );
                 })()}
               </div>
+              )}
 
-              {/* Column 3: Spare Parts & Billing Details (Right Sidebar) */}
-              <div className="w-full lg:w-80 xl:w-96 min-w-0 p-5.5 bg-slate-50 flex flex-col justify-between border-t lg:border-t-0 border-slate-200 shrink-0 lg:overflow-y-auto">
+              {/* Tab: Costos y Estado */}
+              {detailTab === 'costos' && (
+              <div className="max-w-3xl mx-auto p-5.5 animate-fade-in">
                 <div className="space-y-5">
                   <div className="flex justify-between items-center border-b border-slate-200 pb-3">
                     <div className="flex items-center space-x-1.5">
@@ -3502,6 +3531,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   </div>
                 </div>
               </div>
+              )}
             </div>
           </div>
         </div>
