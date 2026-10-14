@@ -3466,30 +3466,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
                   {/* Primary Actions */}
                   <div className="space-y-3.5">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Estado de la Orden
-                      </label>
-                      <CustomSelect
-                        value={selectedOrderForModal.status}
-                        onChange={(val) => {
-                          const newStatus = val as OrderStatus;
-                          updateOrderStatus(
-                            selectedOrderForModal.id,
-                            newStatus,
-                          );
-                          setSelectedOrderForModal((prev) =>
-                            prev ? { ...prev, status: newStatus } : null,
-                          );
-                        }}
-                        className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg font-bold text-slate-700"
-                        options={statuses.map((st) => ({
-                          value: st,
-                          label: st,
-                        }))}
-                      />
-                    </div>
-
                     <button
                       onClick={handleApplyTechnicalEdit}
                       className="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold text-[11px] py-2 px-3 rounded-lg transition flex items-center justify-center space-x-1.5 cursor-pointer"
