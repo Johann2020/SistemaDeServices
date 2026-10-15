@@ -201,9 +201,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [partQuantity, setPartQuantity] = useState(1);
   const [diagnosticsTemp, setDiagnosticsTemp] = useState("");
   const [laborCostTemp, setLaborCostTemp] = useState(0);
-  const [laborItemsTemp, setLaborItemsTemp] = useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [laborItemsTemp, setLaborItemsTemp] = useState<Array<{ id: string; name: string; price: number; quantity: number }>>([]);
   const [newLaborName, setNewLaborName] = useState("");
   const [newLaborPrice, setNewLaborPrice] = useState<number>(0);
+  const [newLaborQty, setNewLaborQty] = useState<number>(1);
   const [isLaborSuggestionOpen, setIsLaborSuggestionOpen] = useState(false);
   const [isLaborManagerOpen, setIsLaborManagerOpen] = useState(false);
   const laborInputRef = useRef<HTMLDivElement>(null);
@@ -289,7 +290,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         : "";
 
     const trabajosRealizados = order.laborItems && order.laborItems.length > 0
-      ? `\n\n*Trabajos realizados:*\n` + order.laborItems.map(li => `• ${li.name} - $${li.price.toLocaleString("es-AR")}`).join("\n")
+      ? `\n\n*Trabajos realizados:*\n` + order.laborItems.map(li => `• ${li.name}${(li.quantity || 1) > 1 ? ` (x${li.quantity})` : ''} - $${(li.price * (li.quantity || 1)).toLocaleString("es-AR")}`).join("\n")
       : "";
 
     const infoManoObraListo = order.laborCost
@@ -476,9 +477,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     setSelectedOrderId(orderToOpen.id);
     setDiagnosticsTemp(order.diagnosticNotes || "");
     setLaborCostTemp(order.laborCost);
-    setLaborItemsTemp(order.laborItems || []);
+    setLaborItemsTemp((order.laborItems || []).map(li => ({ ...li, quantity: li.quantity || 1 })));
     setNewLaborName("");
     setNewLaborPrice(0);
+    setNewLaborQty(1);
     setPaymentStatusTemp(order.paymentStatus || "Pendiente");
     setAmountPaidTemp(order.amountPaid || 0);
 
@@ -568,7 +570,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const handleApplyTechnicalEdit = () => {
     if (!selectedOrderForModal) return;
 
-    const computedLaborCost = laborItemsTemp.reduce((s, li) => s + li.price, 0);
+    const computedLaborCost = laborItemsTemp.reduce((s, li) => s + li.price * (li.quantity || 1), 0);
     const finalPaymentStatus = paymentStatusTemp === "Pagado" ? "Pagado" : paymentStatusTemp === "Parcial" ? "Parcial" : "Pendiente";
     const finalAmountPaid = finalPaymentStatus === "Pendiente" ? 0 : finalPaymentStatus === "Pagado"
       ? computedLaborCost + (selectedOrderForModal.partsUsed?.reduce((s, p) => s + p.price * p.quantity, 0) || 0)
@@ -2401,14 +2403,18 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             <div key={li.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs">
                               <div className="min-w-0 flex-1">
                                 <span className="font-semibold text-slate-700 block truncate">{li.name}</span>
-                                <span className="text-slate-400 text-[10px]">${li.price.toLocaleString("es-AR")}</span>
+                                <span className="text-slate-400 text-[10px]">
+                                  {(li.quantity || 1) > 1
+                                    ? `${li.quantity} x $${li.price.toLocaleString("es-AR")} = $${(li.price * li.quantity).toLocaleString("es-AR")}`
+                                    : `$${li.price.toLocaleString("es-AR")}`}
+                                </span>
                               </div>
                               <button
                                 type="button"
                                 onClick={() => {
                                   const updated = laborItemsTemp.filter(x => x.id !== li.id);
                                   setLaborItemsTemp(updated);
-                                  setLaborCostTemp(updated.reduce((s, x) => s + x.price, 0));
+                                  setLaborCostTemp(updated.reduce((s, x) => s + x.price * (x.quantity || 1), 0));
                                 }}
                                 className="text-rose-400 hover:text-rose-600 hover:bg-rose-50 p-1 rounded transition shrink-0 ml-1"
                               >
@@ -2417,7 +2423,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             </div>
                           ))}
                           <div className="text-right text-[11px] font-bold text-slate-600 pr-1">
-                            Total: ${laborItemsTemp.reduce((s, li) => s + li.price, 0).toLocaleString("es-AR")}
+                            Total: ${laborItemsTemp.reduce((s, li) => s + li.price * (li.quantity || 1), 0).toLocaleString("es-AR")}
                           </div>
                         </div>
                       )}
@@ -2469,27 +2475,37 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                               onChange={(e) => setNewLaborPrice(parseFloat(e.target.value) || 0)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter" && newLaborName && newLaborPrice > 0) {
-                                  const item = { id: crypto.randomUUID(), name: newLaborName, price: newLaborPrice };
+                                  const item = { id: crypto.randomUUID(), name: newLaborName, price: newLaborPrice, quantity: newLaborQty || 1 };
                                   const updated = [...laborItemsTemp, item];
                                   setLaborItemsTemp(updated);
-                                  setLaborCostTemp(updated.reduce((s, x) => s + x.price, 0));
+                                  setLaborCostTemp(updated.reduce((s, x) => s + x.price * (x.quantity || 1), 0));
                                   setNewLaborName("");
                                   setNewLaborPrice(0);
+                                  setNewLaborQty(1);
                                 }
                               }}
                               className="w-full pl-6 pr-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white font-medium"
                             />
                           </div>
+                          <input
+                            type="number"
+                            min="1"
+                            placeholder="Cant."
+                            value={newLaborQty}
+                            onChange={(e) => setNewLaborQty(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-16 py-1.5 text-xs text-center bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white font-medium"
+                          />
                           <button
                             type="button"
                             disabled={!newLaborName || newLaborPrice <= 0}
                             onClick={() => {
-                              const item = { id: crypto.randomUUID(), name: newLaborName, price: newLaborPrice };
+                              const item = { id: crypto.randomUUID(), name: newLaborName, price: newLaborPrice, quantity: newLaborQty || 1 };
                               const updated = [...laborItemsTemp, item];
                               setLaborItemsTemp(updated);
-                              setLaborCostTemp(updated.reduce((s, x) => s + x.price, 0));
+                              setLaborCostTemp(updated.reduce((s, x) => s + x.price * (x.quantity || 1), 0));
                               setNewLaborName("");
                               setNewLaborPrice(0);
+                              setNewLaborQty(1);
                             }}
                             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition shrink-0 flex items-center gap-1"
                           >
@@ -3517,8 +3533,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   <div className="bg-slate-55 border border-slate-200 rounded-md py-1.5 px-2.5 text-xs leading-normal space-y-0.5">
                     {selectedOrderForModal.laborItems.map(li => (
                       <div key={li.id} className="flex justify-between text-slate-700">
-                        <span>{li.name}</span>
-                        <span className="text-slate-500 font-medium">${li.price.toLocaleString('es-AR')}</span>
+                        <span>{li.name}{(li.quantity || 1) > 1 ? ` (x${li.quantity})` : ''}</span>
+                        <span className="text-slate-500 font-medium">${(li.price * (li.quantity || 1)).toLocaleString('es-AR')}</span>
                       </div>
                     ))}
                   </div>
@@ -3543,9 +3559,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     selectedOrderForModal.laborItems.map((li) => (
                       <tr key={li.id}>
                         <td className="py-1 px-2.5 text-slate-700 text-[10.5px]">{li.name}</td>
-                        <td className="py-1 px-2.5 text-center text-slate-600 text-[10.5px]">1</td>
+                        <td className="py-1 px-2.5 text-center text-slate-600 text-[10.5px]">{li.quantity || 1}</td>
                         <td className="py-1 px-2.5 text-right text-slate-700 text-[10.5px]">${li.price.toLocaleString('es-AR')}</td>
-                        <td className="py-1 px-2.5 text-right text-slate-900 font-bold text-[10.5px]">${li.price.toLocaleString('es-AR')}</td>
+                        <td className="py-1 px-2.5 text-right text-slate-900 font-bold text-[10.5px]">${(li.price * (li.quantity || 1)).toLocaleString('es-AR')}</td>
                       </tr>
                     ))
                   ) : (

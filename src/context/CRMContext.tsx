@@ -822,7 +822,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Recalculate laborCost from laborItems if provided
         if (data.laborItems !== undefined) {
-          merged.laborCost = merged.laborItems.reduce((sum, li) => sum + li.price, 0);
+          merged.laborCost = merged.laborItems.reduce((sum, li) => sum + li.price * (li.quantity || 1), 0);
           apiData.laborCost = merged.laborCost;
         }
 
