@@ -266,40 +266,40 @@ function getTenantDb(tenantId) {
     });
   }
 
-  // Populate technicianId on orders from assignedTechnician name
+  // Populate technicianId on orders from assignedTechnician name (case-insensitive)
   const techList = db.prepare('SELECT id, name FROM technicians').all();
   if (techList.length > 0) {
-    const techByName = {};
-    for (const t of techList) techByName[t.name] = t.id;
+    const techByLower = {};
+    for (const t of techList) techByLower[t.name.toLowerCase()] = t;
     const ordersNoTech = db.prepare("SELECT id, assignedTechnician FROM orders WHERE (technicianId IS NULL OR technicianId = '') AND assignedTechnician != ''").all();
     if (ordersNoTech.length > 0) {
-      const updTech = db.prepare('UPDATE orders SET technicianId = ? WHERE id = ?');
+      const updTech = db.prepare('UPDATE orders SET technicianId = ?, assignedTechnician = ? WHERE id = ?');
       for (const o of ordersNoTech) {
-        const tid = techByName[o.assignedTechnician];
-        if (tid) updTech.run(tid, o.id);
+        const match = techByLower[o.assignedTechnician.toLowerCase()];
+        if (match) updTech.run(match.id, match.name, o.id);
       }
     }
   }
 
-  // Populate deviceTypeId on orders and budgets from deviceType name
+  // Populate deviceTypeId on orders and budgets from deviceType name (case-insensitive)
   const dtList = db.prepare('SELECT id, name FROM device_types').all();
   if (dtList.length > 0) {
-    const dtByName = {};
-    for (const dt of dtList) dtByName[dt.name] = dt.id;
+    const dtByLower = {};
+    for (const dt of dtList) dtByLower[dt.name.toLowerCase()] = dt;
     const ordersNoDT = db.prepare("SELECT id, deviceType FROM orders WHERE (deviceTypeId IS NULL OR deviceTypeId = '') AND deviceType != ''").all();
     if (ordersNoDT.length > 0) {
-      const updODT = db.prepare('UPDATE orders SET deviceTypeId = ? WHERE id = ?');
+      const updODT = db.prepare('UPDATE orders SET deviceTypeId = ?, deviceType = ? WHERE id = ?');
       for (const o of ordersNoDT) {
-        const dtid = dtByName[o.deviceType];
-        if (dtid) updODT.run(dtid, o.id);
+        const match = dtByLower[o.deviceType.toLowerCase()];
+        if (match) updODT.run(match.id, match.name, o.id);
       }
     }
     const budgetsNoDT = db.prepare("SELECT id, deviceType FROM budgets WHERE (deviceTypeId IS NULL OR deviceTypeId = '') AND deviceType != ''").all();
     if (budgetsNoDT.length > 0) {
-      const updBDT = db.prepare('UPDATE budgets SET deviceTypeId = ? WHERE id = ?');
+      const updBDT = db.prepare('UPDATE budgets SET deviceTypeId = ?, deviceType = ? WHERE id = ?');
       for (const b of budgetsNoDT) {
-        const dtid = dtByName[b.deviceType];
-        if (dtid) updBDT.run(dtid, b.id);
+        const match = dtByLower[b.deviceType.toLowerCase()];
+        if (match) updBDT.run(match.id, match.name, b.id);
       }
     }
   }
