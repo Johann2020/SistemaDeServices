@@ -51,31 +51,39 @@ export interface LaborItem {
   quantity: number;
 }
 
+export interface DeviceType {
+  id: string;
+  name: string;
+  active: number;
+  sortOrder: number;
+  createdAt: string;
+}
+
 export interface Order {
-  id: string; // Ticket number like TS-1001
+  id: string;
   clientId: string;
-  clientName: string; // Cached for easy lookup
+  clientName: string;
   clientPhone: string;
-  deviceType: string; // Laptop, Smartphone, Consola, etc.
+  deviceType: string;
+  deviceTypeId?: string;
   brand: string;
   model: string;
   serialNumber: string;
-  description: string; // Problem statement
-  reportedProblem?: string; // Problema reportado (Ingreso)
-  plannedWork?: string; // Trabajos a realizar (Ingreso)
-  devicePassword?: string; // Contraseña o PIN del dispositivo
-  devicePattern?: string; // Patrón de desbloqueo (para Teléfono o Tablet)
-  diagnosticNotes?: string; // Technician diagnosis
-  workPerformed?: string; // Work done by technician
+  description: string;
+  reportedProblem?: string;
+  plannedWork?: string;
+  devicePassword?: string;
+  devicePattern?: string;
+  diagnosticNotes?: string;
   status: OrderStatus;
   priority: OrderPriority;
   assignedTechnician: string;
+  technicianId?: string;
   partsUsed: OrderPart[];
   laborItems?: LaborItem[];
   laborCost: number; // Sum of laborItems prices (or legacy single value)
   totalCost: number; // laborCost + sum(parts.price * parts.quantity)
   estimatedDelivery?: string;
-  cancellationReason?: string; // Motivo de cancelación
   paymentStatus?: PaymentStatus;
   amountPaid?: number;
   statusHistory?: StatusHistoryEntry[];
@@ -143,11 +151,12 @@ export interface BudgetItem {
 export type BudgetStatus = 'Borrador' | 'Enviado' | 'Aprobado' | 'Rechazado';
 
 export interface Budget {
-  id: string; // e.g., PR-1001
+  id: string;
   clientId?: string;
   clientName: string;
   clientPhone?: string;
   deviceType?: string;
+  deviceTypeId?: string;
   brand?: string;
   model?: string;
   serialNumber?: string;

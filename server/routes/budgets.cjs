@@ -3,11 +3,31 @@ const router = express.Router();
 const { getById, insert, update, remove } = require('../tenantDb.cjs');
 const crypto = require('crypto');
 
+function resolveBudgetNames(db, budgets) {
+  if (budgets.length === 0) return;
+  const clients = db.prepare('SELECT id, name, phone FROM clients').all();
+  const deviceTypes = db.prepare('SELECT id, name FROM device_types').all();
+  const clientMap = {};
+  for (const c of clients) clientMap[c.id] = c;
+  const dtMap = {};
+  for (const dt of deviceTypes) dtMap[dt.id] = dt;
+  for (const budget of budgets) {
+    if (budget.clientId && clientMap[budget.clientId]) {
+      budget.clientName = clientMap[budget.clientId].name;
+      budget.clientPhone = clientMap[budget.clientId].phone || '';
+    }
+    if (budget.deviceTypeId && dtMap[budget.deviceTypeId]) {
+      budget.deviceType = dtMap[budget.deviceTypeId].name;
+    }
+  }
+}
+
 function getBudgetWithItems(db, budgetId) {
   const budget = db.prepare('SELECT * FROM budgets WHERE id = ?').get(budgetId);
   if (!budget) return null;
   budget.items = db.prepare('SELECT * FROM budget_items WHERE budgetId = ?').all(budgetId);
   budget.totalCost = budget.totalCost || 0;
+  resolveBudgetNames(db, [budget]);
   return budget;
 }
 
@@ -26,6 +46,7 @@ function getAllBudgetsWithItems(db) {
     budget.items = itemsMap[budget.id] || [];
     budget.totalCost = budget.totalCost || 0;
   }
+  resolveBudgetNames(db, budgets);
   return budgets;
 }
 

@@ -2,6 +2,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 const fs = require('fs');
 
+const crypto = require('crypto');
 const { dataDir } = require('./masterDb.cjs');
 
 const SCHEMA_SQL = `
@@ -37,6 +38,8 @@ const SCHEMA_SQL = `
     priority TEXT DEFAULT 'Media',
     status TEXT DEFAULT 'Ingresado',
     assignedTechnician TEXT DEFAULT '',
+    technicianId TEXT DEFAULT '',
+    deviceTypeId TEXT DEFAULT '',
     laborCost REAL DEFAULT 0,
     totalCost REAL DEFAULT 0,
     estimatedDelivery TEXT DEFAULT '',
@@ -63,6 +66,7 @@ const SCHEMA_SQL = `
     orderId TEXT NOT NULL,
     name TEXT DEFAULT '',
     price REAL DEFAULT 0,
+    quantity INTEGER DEFAULT 1,
     PRIMARY KEY (orderId, id),
     FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
   );
@@ -112,6 +116,7 @@ const SCHEMA_SQL = `
     clientName TEXT DEFAULT '',
     clientPhone TEXT DEFAULT '',
     deviceType TEXT DEFAULT '',
+    deviceTypeId TEXT DEFAULT '',
     brand TEXT DEFAULT '',
     model TEXT DEFAULT '',
     serialNumber TEXT DEFAULT '',
@@ -153,10 +158,21 @@ const SCHEMA_SQL = `
     value TEXT DEFAULT ''
   );
 
+  CREATE TABLE IF NOT EXISTS device_types (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    active INTEGER DEFAULT 1,
+    sortOrder INTEGER DEFAULT 0,
+    createdAt TEXT DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_orders_clientId ON orders(clientId);
   CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+  CREATE INDEX IF NOT EXISTS idx_orders_technicianId ON orders(technicianId);
+  CREATE INDEX IF NOT EXISTS idx_orders_deviceTypeId ON orders(deviceTypeId);
   CREATE INDEX IF NOT EXISTS idx_order_status_history_orderId ON order_status_history(orderId);
   CREATE INDEX IF NOT EXISTS idx_budgets_clientId ON budgets(clientId);
+  CREATE INDEX IF NOT EXISTS idx_budgets_deviceTypeId ON budgets(deviceTypeId);
 `;
 
 const dbCache = new Map();
@@ -205,6 +221,88 @@ function getTenantDb(tenantId) {
     }
   }
 
+  // Add normalization columns
+  if (!columns.includes('technicianId')) {
+    db.exec("ALTER TABLE orders ADD COLUMN technicianId TEXT DEFAULT ''");
+  }
+  if (!columns.includes('deviceTypeId')) {
+    db.exec("ALTER TABLE orders ADD COLUMN deviceTypeId TEXT DEFAULT ''");
+  }
+
+  const budgetCols = db.prepare("PRAGMA table_info(budgets)").all().map(c => c.name);
+  if (!budgetCols.includes('deviceTypeId')) {
+    db.exec("ALTER TABLE budgets ADD COLUMN deviceTypeId TEXT DEFAULT ''");
+  }
+
+  const laborCols = db.prepare("PRAGMA table_info(order_labor_items)").all().map(c => c.name);
+  if (!laborCols.includes('quantity')) {
+    db.exec("ALTER TABLE order_labor_items ADD COLUMN quantity INTEGER DEFAULT 1");
+  }
+
+  // Populate device_types table from settings
+  const dtCount = db.prepare('SELECT COUNT(*) as cnt FROM device_types').get();
+  if (dtCount.cnt === 0) {
+    const DEFAULTS = [
+      'Notebook', 'Celular', 'Tablet', 'CPU / PC Desktop',
+      'Televisor / Monitor', 'Impresora', 'Consola de Videojuegos',
+      'Smartwatch', 'Radio / Equipo de Audio', 'Microondas / Horno',
+      'Lavarropas / Secarropas', 'Aire Acondicionado / Ventilador',
+      'Cafetera', 'Licuadora / Procesadora', 'Cámara Fotográfica'
+    ];
+    let allTypes = [...DEFAULTS];
+    let activeTypes = [...DEFAULTS];
+    const allSetting = db.prepare("SELECT value FROM settings WHERE key = 'allDeviceTypes'").get();
+    if (allSetting) {
+      try { allTypes = [...new Set([...DEFAULTS, ...JSON.parse(allSetting.value)])]; } catch (_) {}
+    }
+    const activeSetting = db.prepare("SELECT value FROM settings WHERE key = 'activeDeviceTypes'").get();
+    if (activeSetting) {
+      try { activeTypes = JSON.parse(activeSetting.value); } catch (_) {}
+    }
+    const insertDT = db.prepare('INSERT OR IGNORE INTO device_types (id, name, active, sortOrder) VALUES (?, ?, ?, ?)');
+    allTypes.forEach((name, idx) => {
+      insertDT.run(crypto.randomUUID(), name, activeTypes.includes(name) ? 1 : 0, idx);
+    });
+  }
+
+  // Populate technicianId on orders from assignedTechnician name
+  const techList = db.prepare('SELECT id, name FROM technicians').all();
+  if (techList.length > 0) {
+    const techByName = {};
+    for (const t of techList) techByName[t.name] = t.id;
+    const ordersNoTech = db.prepare("SELECT id, assignedTechnician FROM orders WHERE (technicianId IS NULL OR technicianId = '') AND assignedTechnician != ''").all();
+    if (ordersNoTech.length > 0) {
+      const updTech = db.prepare('UPDATE orders SET technicianId = ? WHERE id = ?');
+      for (const o of ordersNoTech) {
+        const tid = techByName[o.assignedTechnician];
+        if (tid) updTech.run(tid, o.id);
+      }
+    }
+  }
+
+  // Populate deviceTypeId on orders and budgets from deviceType name
+  const dtList = db.prepare('SELECT id, name FROM device_types').all();
+  if (dtList.length > 0) {
+    const dtByName = {};
+    for (const dt of dtList) dtByName[dt.name] = dt.id;
+    const ordersNoDT = db.prepare("SELECT id, deviceType FROM orders WHERE (deviceTypeId IS NULL OR deviceTypeId = '') AND deviceType != ''").all();
+    if (ordersNoDT.length > 0) {
+      const updODT = db.prepare('UPDATE orders SET deviceTypeId = ? WHERE id = ?');
+      for (const o of ordersNoDT) {
+        const dtid = dtByName[o.deviceType];
+        if (dtid) updODT.run(dtid, o.id);
+      }
+    }
+    const budgetsNoDT = db.prepare("SELECT id, deviceType FROM budgets WHERE (deviceTypeId IS NULL OR deviceTypeId = '') AND deviceType != ''").all();
+    if (budgetsNoDT.length > 0) {
+      const updBDT = db.prepare('UPDATE budgets SET deviceTypeId = ? WHERE id = ?');
+      for (const b of budgetsNoDT) {
+        const dtid = dtByName[b.deviceType];
+        if (dtid) updBDT.run(dtid, b.id);
+      }
+    }
+  }
+
   // Migrate legacy workPerformed → diagnosticNotes for orders without laborItems
   const legacyOrders = db.prepare(
     `SELECT id, diagnosticNotes, workPerformed FROM orders
@@ -241,7 +339,7 @@ function getById(db, table, id) {
 const VALID_TABLES = new Set([
   'clients', 'orders', 'order_parts', 'order_labor_items', 'order_status_history',
   'inventory', 'technicians', 'budgets', 'budget_items',
-  'users', 'settings',
+  'users', 'settings', 'device_types',
 ]);
 
 function assertTable(table) {

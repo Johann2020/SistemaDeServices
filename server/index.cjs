@@ -137,6 +137,7 @@ app.use('/api/technicians', require('./routes/technicians.cjs'));
 app.use('/api/budgets', require('./routes/budgets.cjs'));
 app.use('/api/users', require('./routes/users.cjs'));
 app.use('/api/settings', require('./routes/settings.cjs'));
+app.use('/api/device-types', require('./routes/deviceTypes.cjs'));
 app.use('/api/superadmin', require('./routes/superadmin.cjs'));
 
 // Migration endpoint (superadmin only, larger body limit)

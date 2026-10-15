@@ -1,4 +1,4 @@
-import type { Client, Order, SparePartInventoryItem, Technician, Budget } from './types';
+import type { Client, Order, SparePartInventoryItem, Technician, Budget, DeviceType } from './types';
 
 const BASE = '/api';
 
@@ -49,6 +49,12 @@ export const api = {
     create: (data: Partial<Technician>) => request<Technician>('/technicians', { method: 'POST', body: JSON.stringify(data) }),
     update: (id: string, data: Partial<Technician>) => request<Technician>(`/technicians/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) => request<void>(`/technicians/${id}`, { method: 'DELETE' }),
+  },
+  deviceTypes: {
+    list: () => request<DeviceType[]>('/device-types'),
+    create: (data: Partial<DeviceType>) => request<DeviceType>('/device-types', { method: 'POST', body: JSON.stringify(data) }),
+    update: (id: string, data: Partial<DeviceType>) => request<DeviceType>(`/device-types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    delete: (id: string) => request<void>(`/device-types/${id}`, { method: 'DELETE' }),
   },
   budgets: {
     list: () => request<Budget[]>('/budgets'),

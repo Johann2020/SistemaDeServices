@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
-import { Client, Order, SparePartInventoryItem, OrderStatus, OrderPriority, OrderPart, CRMStats, DelayConfig, Technician, Toast, Budget, BudgetItem, BudgetStatus, PaymentStatus } from '../types';
+import { Client, Order, SparePartInventoryItem, OrderStatus, OrderPriority, OrderPart, CRMStats, DelayConfig, Technician, Toast, Budget, BudgetItem, BudgetStatus, PaymentStatus, DeviceType } from '../types';
 import { api } from '../api';
 import { DEVICE_TYPES } from '../data';
 
@@ -174,8 +174,9 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     activeTickets: 0
   });
 
-  const [allDeviceTypes, setAllDeviceTypes] = useState<string[]>([...DEVICE_TYPES]);
-  const [activeDeviceTypes, setActiveDeviceTypesState] = useState<string[]>([...DEVICE_TYPES]);
+  const [deviceTypesData, setDeviceTypesData] = useState<DeviceType[]>([]);
+  const allDeviceTypes = deviceTypesData.length > 0 ? deviceTypesData.map(dt => dt.name) : [...DEVICE_TYPES];
+  const activeDeviceTypes = deviceTypesData.length > 0 ? deviceTypesData.filter(dt => dt.active === 1).map(dt => dt.name) : [...DEVICE_TYPES];
   const [laborItemTemplates, setLaborItemTemplatesState] = useState<Array<{ name: string; price: number }>>([]);
 
   const [exchangeRate, setExchangeRate] = useState<number>(1050);
@@ -253,46 +254,42 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addDeviceType = (name: string) => {
-    setAllDeviceTypes(prev => {
-      if (prev.includes(name)) return prev;
-      const updated = [...prev, name];
-      api.settings.set('allDeviceTypes', JSON.stringify(updated)).catch(console.error);
-      return updated;
-    });
-    setActiveDeviceTypesState(prev => {
-      if (prev.includes(name)) return prev;
-      const updated = [...prev, name];
-      api.settings.set('activeDeviceTypes', JSON.stringify(updated)).catch(console.error);
-      return updated;
-    });
+    if (deviceTypesData.some(dt => dt.name === name)) return;
+    const newDT: DeviceType = {
+      id: `dt-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      name,
+      active: 1,
+      sortOrder: deviceTypesData.length,
+      createdAt: new Date().toISOString()
+    };
+    setDeviceTypesData(prev => [...prev, newDT]);
+    api.deviceTypes.create(newDT).catch(console.error);
   };
 
   const renameDeviceType = (oldName: string, newName: string) => {
     const trimmed = newName.trim();
     if (!trimmed || trimmed === oldName) return;
-    setAllDeviceTypes(prev => {
-      const updated = prev.map(t => t === oldName ? trimmed : t);
-      api.settings.set('allDeviceTypes', JSON.stringify(updated)).catch(console.error);
-      return updated;
-    });
-    setActiveDeviceTypesState(prev => {
-      const updated = prev.map(t => t === oldName ? trimmed : t);
-      api.settings.set('activeDeviceTypes', JSON.stringify(updated)).catch(console.error);
-      return updated;
-    });
-    setOrders(prev => prev.map(o => {
-      if (o.deviceType === oldName) {
-        const updated = { ...o, deviceType: trimmed };
-        api.orders.update(o.id, { deviceType: trimmed }).catch(console.error);
-        return updated;
-      }
-      return o;
-    }));
+    const dt = deviceTypesData.find(d => d.name === oldName);
+    if (!dt) return;
+    if (deviceTypesData.some(d => d.name.toLowerCase() === trimmed.toLowerCase() && d.id !== dt.id)) return;
+    setDeviceTypesData(prev => prev.map(d => d.id === dt.id ? { ...d, name: trimmed } : d));
+    api.deviceTypes.update(dt.id, { name: trimmed }).catch(console.error);
+    setOrders(prev => prev.map(o => o.deviceType === oldName ? { ...o, deviceType: trimmed } : o));
   };
 
   const setActiveDeviceTypes = (types: string[]) => {
-    setActiveDeviceTypesState(types);
-    api.settings.set('activeDeviceTypes', JSON.stringify(types)).catch(console.error);
+    setDeviceTypesData(prev => {
+      const updated = prev.map(dt => ({
+        ...dt,
+        active: types.includes(dt.name) ? 1 : 0
+      }));
+      updated.forEach((dt, i) => {
+        if (prev[i] && prev[i].active !== dt.active) {
+          api.deviceTypes.update(dt.id, { active: dt.active }).catch(console.error);
+        }
+      });
+      return updated;
+    });
   };
 
   const setLaborItemTemplates = (items: Array<{ name: string; price: number }>) => {
@@ -308,13 +305,14 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const loadFromAPI = async () => {
       try {
-        const [apiClients, apiOrders, apiInventory, apiTechnicians, apiBudgets, apiSettings] = await Promise.all([
+        const [apiClients, apiOrders, apiInventory, apiTechnicians, apiBudgets, apiSettings, apiDeviceTypes] = await Promise.all([
           api.clients.list().catch(() => null),
           api.orders.list().catch(() => null),
           api.inventory.list().catch(() => null),
           api.technicians.list().catch(() => null),
           api.budgets.list().catch(() => null),
           api.settings.getAll().catch(() => null),
+          api.deviceTypes.list().catch(() => null),
         ]);
 
         if (cancelled) return;
@@ -334,6 +332,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setTechnicians(apiTechnicians || []);
           setBudgets((apiBudgets || []).map((b: any) => ({ ...b, items: b.items || [] })));
 
+          if (apiDeviceTypes && apiDeviceTypes.length > 0) {
+            setDeviceTypesData(apiDeviceTypes);
+          }
+
           if (apiSettings) {
             if (apiSettings.exchangeRate) setExchangeRate(Number(apiSettings.exchangeRate) || 1050);
             if (apiSettings.categoryMargins) {
@@ -348,16 +350,6 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (apiSettings.ticketTitle) setTicketTitle(apiSettings.ticketTitle);
             if (apiSettings.ticketSub) setTicketSub(apiSettings.ticketSub);
             if (apiSettings.ticketTerms) setTicketTerms(apiSettings.ticketTerms);
-            if (apiSettings.allDeviceTypes) {
-              try {
-                const parsed = JSON.parse(apiSettings.allDeviceTypes);
-                const merged = [...new Set([...DEVICE_TYPES, ...parsed])];
-                setAllDeviceTypes(merged);
-              } catch {}
-            }
-            if (apiSettings.activeDeviceTypes) {
-              try { setActiveDeviceTypesState(JSON.parse(apiSettings.activeDeviceTypes)); } catch {}
-            }
             if (apiSettings.laborItemTemplates) {
               try { setLaborItemTemplatesState(JSON.parse(apiSettings.laborItemTemplates)); } catch {}
             }
@@ -420,13 +412,20 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const storedActiveDeviceTypes = localStorage.getItem(`crm_${tenantId}_activeDeviceTypes`);
     if (storedAllDeviceTypes) {
       try {
-        const parsed = JSON.parse(storedAllDeviceTypes);
+        const parsed: string[] = JSON.parse(storedAllDeviceTypes);
         const merged = [...new Set([...DEVICE_TYPES, ...parsed])];
-        setAllDeviceTypes(merged);
+        let activeSet: string[] = merged;
+        if (storedActiveDeviceTypes) {
+          try { activeSet = JSON.parse(storedActiveDeviceTypes); } catch {}
+        }
+        setDeviceTypesData(merged.map((name, idx) => ({
+          id: `dt-local-${idx}`,
+          name,
+          active: activeSet.includes(name) ? 1 : 0,
+          sortOrder: idx,
+          createdAt: new Date().toISOString()
+        })));
       } catch {}
-    }
-    if (storedActiveDeviceTypes) {
-      try { setActiveDeviceTypesState(JSON.parse(storedActiveDeviceTypes)); } catch {}
     }
 
     // Load Category Margins
@@ -761,12 +760,16 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const nextId = `TS-${lastNum + 1}`;
     const nowStr = new Date().toISOString();
     
+    const tech = technicians.find(t => t.name === orderData.assignedTechnician);
+    const dt = deviceTypesData.find(d => d.name === orderData.deviceType);
+
     const newOrder: Order = {
       id: nextId,
       clientId: client.id,
       clientName: client.name,
       clientPhone: client.phone || '',
       deviceType: orderData.deviceType,
+      deviceTypeId: dt?.id || '',
       brand: orderData.brand,
       model: orderData.model,
       serialNumber: orderData.serialNumber || 'S/N',
@@ -774,10 +777,10 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       reportedProblem: orderData.reportedProblem || orderData.description,
       plannedWork: orderData.plannedWork || '',
       diagnosticNotes: '',
-      workPerformed: '',
       status: 'Ingresado',
       priority: orderData.priority,
       assignedTechnician: orderData.assignedTechnician,
+      technicianId: tech?.id || '',
       partsUsed: [],
       laborCost: Number(orderData.laborCost) || 0,
       totalCost: Number(orderData.laborCost) || 0,
@@ -820,6 +823,14 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateOrderDetails = (orderId: string, data: Partial<Order>) => {
+    if (data.deviceType !== undefined && !data.deviceTypeId) {
+      const dt = deviceTypesData.find(d => d.name === data.deviceType);
+      if (dt) data.deviceTypeId = dt.id;
+    }
+    if (data.assignedTechnician !== undefined && !data.technicianId) {
+      const tech = technicians.find(t => t.name === data.assignedTechnician);
+      if (tech) data.technicianId = tech.id;
+    }
     const apiData = { ...data };
     setOrders(prev =>
       prev.map(order => {
@@ -1000,21 +1011,20 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map(c => (c.id === clientId ? { ...c, ...data } : c))
     );
     api.clients.update(clientId, data).catch(console.error);
-    // Cascade changes to any orders caching these client info fields
-    setOrders(prev =>
-      prev.map(order => {
-        if (order.clientId === clientId) {
-          const updated = {
-            ...order,
-            clientName: data.name !== undefined ? data.name : order.clientName,
-            clientPhone: data.phone !== undefined ? data.phone : order.clientPhone
-          };
-          api.orders.update(order.id, { clientName: updated.clientName, clientPhone: updated.clientPhone }).catch(console.error);
-          return updated;
-        }
-        return order;
-      })
-    );
+    if (data.name !== undefined || data.phone !== undefined) {
+      setOrders(prev =>
+        prev.map(order => {
+          if (order.clientId === clientId) {
+            return {
+              ...order,
+              clientName: data.name !== undefined ? data.name : order.clientName,
+              clientPhone: data.phone !== undefined ? data.phone : order.clientPhone
+            };
+          }
+          return order;
+        })
+      );
+    }
   };
 
   const searchClientsPredictive = (query: string): Client[] => {
@@ -1038,7 +1048,6 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         laborCost: 0,
         totalCost: 0,
         diagnosticNotes: '',
-        workPerformed: '',
         status: 'Ingresado' as OrderStatus,
         updatedAt: new Date().toISOString()
       };
@@ -1104,12 +1113,11 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
     api.technicians.update(id, { ...data, name: newName || undefined }).catch(console.error);
 
-    // Cascade rename to existing orders matching the old assignedTechnician
     if (oldName && newName && oldName !== newName) {
       setOrders(prev =>
         prev.map(order =>
           order.assignedTechnician === oldName
-            ? { ...order, assignedTechnician: newName, updatedAt: new Date().toISOString() }
+            ? { ...order, assignedTechnician: newName }
             : order
         )
       );
@@ -1326,9 +1334,11 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const totalCost = budgetData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const dt = budgetData.deviceType ? deviceTypesData.find(d => d.name === budgetData.deviceType) : null;
     const newBudget: Budget = {
       id,
       ...budgetData,
+      deviceTypeId: dt?.id || '',
       totalCost,
       createdAt: new Date().toISOString()
     };
@@ -1421,11 +1431,14 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const currentPlanned = existingOrder.plannedWork || '';
       const mergedPlanned = currentPlanned ? currentPlanned + '\n' + plannedWorkText : plannedWorkText;
 
+      const techName = assignedTechnician || existingOrder.assignedTechnician;
+      const techObj = technicians.find(t => t.name === techName);
       const updates = {
         partsUsed: updatedParts,
         laborCost: newLaborCost,
         totalCost,
-        assignedTechnician: assignedTechnician || existingOrder.assignedTechnician,
+        assignedTechnician: techName,
+        technicianId: techObj?.id || existingOrder.technicianId || '',
         plannedWork: mergedPlanned,
         updatedAt: new Date().toISOString(),
       };

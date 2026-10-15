@@ -3,6 +3,31 @@ const router = express.Router();
 const { getById, insert, update, remove } = require('../tenantDb.cjs');
 const crypto = require('crypto');
 
+function resolveOrderNames(db, orders) {
+  if (orders.length === 0) return;
+  const clients = db.prepare('SELECT id, name, phone FROM clients').all();
+  const technicians = db.prepare('SELECT id, name FROM technicians').all();
+  const deviceTypes = db.prepare('SELECT id, name FROM device_types').all();
+  const clientMap = {};
+  for (const c of clients) clientMap[c.id] = c;
+  const techMap = {};
+  for (const t of technicians) techMap[t.id] = t;
+  const dtMap = {};
+  for (const dt of deviceTypes) dtMap[dt.id] = dt;
+  for (const order of orders) {
+    if (order.clientId && clientMap[order.clientId]) {
+      order.clientName = clientMap[order.clientId].name;
+      order.clientPhone = clientMap[order.clientId].phone || '';
+    }
+    if (order.technicianId && techMap[order.technicianId]) {
+      order.assignedTechnician = techMap[order.technicianId].name;
+    }
+    if (order.deviceTypeId && dtMap[order.deviceTypeId]) {
+      order.deviceType = dtMap[order.deviceTypeId].name;
+    }
+  }
+}
+
 function getOrderWithRelations(db, orderId) {
   const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
   if (!order) return null;
@@ -13,10 +38,11 @@ function getOrderWithRelations(db, orderId) {
   order.paymentStatus = order.paymentStatus || 'Pendiente';
   order.amountPaid = order.amountPaid || 0;
   const laborSum = order.laborItems.length > 0
-    ? order.laborItems.reduce((s, li) => s + (li.price || 0), 0)
+    ? order.laborItems.reduce((s, li) => s + (li.price || 0) * (li.quantity || 1), 0)
     : (order.laborCost || 0);
   const partsSum = order.partsUsed.reduce((s, p) => s + (p.price || 0) * (p.quantity || 1), 0);
   order.totalCost = laborSum + partsSum;
+  resolveOrderNames(db, [order]);
   return order;
 }
 
@@ -52,11 +78,13 @@ function getAllOrdersWithRelations(db) {
     order.paymentStatus = order.paymentStatus || 'Pendiente';
     order.amountPaid = order.amountPaid || 0;
     const laborSum = order.laborItems.length > 0
-      ? order.laborItems.reduce((s, li) => s + (li.price || 0), 0)
+      ? order.laborItems.reduce((s, li) => s + (li.price || 0) * (li.quantity || 1), 0)
       : (order.laborCost || 0);
     const partsSum = order.partsUsed.reduce((s, p) => s + (p.price || 0) * (p.quantity || 1), 0);
     order.totalCost = laborSum + partsSum;
   }
+
+  resolveOrderNames(db, orders);
   return orders;
 }
 
@@ -104,8 +132,8 @@ router.post('/', (req, res) => {
       for (const item of laborItems) {
         if (!item.id) item.id = crypto.randomUUID();
         req.db.prepare(
-          'INSERT INTO order_labor_items (id, orderId, name, price) VALUES (?, ?, ?, ?)'
-        ).run(item.id, data.id, item.name || '', item.price || 0);
+          'INSERT INTO order_labor_items (id, orderId, name, price, quantity) VALUES (?, ?, ?, ?, ?)'
+        ).run(item.id, data.id, item.name || '', item.price || 0, item.quantity || 1);
       }
       if (statusHistory.length > 0) {
         for (const entry of statusHistory) {
@@ -160,8 +188,8 @@ router.put('/:id', (req, res) => {
         for (const item of laborItems) {
           if (!item.id) item.id = crypto.randomUUID();
           req.db.prepare(
-            'INSERT INTO order_labor_items (id, orderId, name, price) VALUES (?, ?, ?, ?)'
-          ).run(item.id, req.params.id, item.name || '', item.price || 0);
+            'INSERT INTO order_labor_items (id, orderId, name, price, quantity) VALUES (?, ?, ?, ?, ?)'
+          ).run(item.id, req.params.id, item.name || '', item.price || 0, item.quantity || 1);
         }
       }
       if (Array.isArray(statusHistory)) {

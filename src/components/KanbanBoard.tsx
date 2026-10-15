@@ -469,8 +469,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     if (!order.assignedTechnician && technicians.length > 0) {
       const defaultTech = getDefaultTechnician();
       if (defaultTech) {
-        updateOrderDetails(order.id, { assignedTechnician: defaultTech });
-        orderToOpen = { ...order, assignedTechnician: defaultTech };
+        const tech = technicians.find(t => t.name === defaultTech);
+        updateOrderDetails(order.id, { assignedTechnician: defaultTech, technicianId: tech?.id || '' });
+        orderToOpen = { ...order, assignedTechnician: defaultTech, technicianId: tech?.id || '' };
       }
     }
     setSelectedOrderForModal(orderToOpen);
@@ -986,11 +987,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             value={selectedOrderForModal.assignedTechnician}
             onChange={(val) => {
               if (val) {
+                const tech = technicians.find(t => t.name === val);
                 updateOrderDetails(selectedOrderForModal.id, {
                   assignedTechnician: val,
+                  technicianId: tech?.id || '',
                 });
                 setSelectedOrderForModal((prev) =>
-                  prev ? { ...prev, assignedTechnician: val } : null,
+                  prev ? { ...prev, assignedTechnician: val, technicianId: tech?.id || '' } : null,
                 );
               }
             }}
