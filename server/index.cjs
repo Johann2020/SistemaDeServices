@@ -1,5 +1,7 @@
 const express = require('express');
 const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
+const cors = require('cors');
 const path = require('path');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
@@ -10,10 +12,37 @@ const { findAccountByEmail, recordLogin, masterDb, checkpointMasterDb, closeMast
 const app = express();
 const PORT = process.env.PORT || 3002;
 
+// Security headers
+app.use(helmet({
+  contentSecurityPolicy: false,
+}));
+
+// CORS: only allow the app's own origins
+const allowedOrigins = [
+  'https://sistemadeservices.onrender.com',
+  'http://localhost:4000',
+  'http://localhost:3002',
+];
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error('Origen no permitido'));
+  },
+  credentials: true,
+}));
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 20,
   message: { error: 'Demasiados intentos de autenticación, intenta en 15 minutos' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000,
+  max: 200,
+  message: { error: 'Demasiadas solicitudes, intenta en un minuto' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -90,8 +119,8 @@ app.get('/api/health', (req, res) => {
 });
 
 // --- Tenant-scoped API routes ---
-// Middleware: authenticate + inject tenant DB into req.db
-app.use('/api', authMiddleware, (req, res, next) => {
+// Middleware: authenticate + rate limit + inject tenant DB into req.db
+app.use('/api', apiLimiter, authMiddleware, (req, res, next) => {
   try {
     req.db = getTenantDb(req.tenantId);
     next();
@@ -110,10 +139,11 @@ app.use('/api/users', require('./routes/users.cjs'));
 app.use('/api/settings', require('./routes/settings.cjs'));
 app.use('/api/superadmin', require('./routes/superadmin.cjs'));
 
-// Migration endpoint (admin only, larger body limit)
+// Migration endpoint (superadmin only, larger body limit)
+const SUPERADMIN_EMAIL = process.env.SUPERADMIN_EMAIL || 'gelrothjohann@gmail.com';
 app.post('/api/migrate', express.json({ limit: '50mb' }), (req, res) => {
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Solo administradores pueden migrar datos' });
+  if (req.user.email !== SUPERADMIN_EMAIL) {
+    return res.status(403).json({ error: 'Solo el superadmin puede migrar datos' });
   }
   try {
     const db = req.db;
