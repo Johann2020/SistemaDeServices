@@ -2430,14 +2430,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
                       {/* Add new labor item */}
                       <div className="bg-white border border-indigo-100 rounded-lg p-2.5 space-y-2" ref={laborInputRef}>
-                        <div className="relative">
+                        <div className="relative flex items-center gap-2">
                           <input
                             type="text"
                             placeholder="Ej. Reinstalación Windows, Limpieza..."
                             value={newLaborName}
                             onFocus={() => { if (laborSuggestions.length > 0) setIsLaborSuggestionOpen(true); }}
                             onChange={(e) => { setNewLaborName(e.target.value); setIsLaborSuggestionOpen(true); }}
-                            className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white"
+                            className="flex-1 min-w-0 text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white"
+                          />
+                          <input
+                            type="number"
+                            min="1"
+                            title="Cantidad"
+                            value={newLaborQty}
+                            onChange={(e) => setNewLaborQty(Math.max(1, parseInt(e.target.value) || 1))}
+                            className="w-14 py-2 text-xs text-center bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white font-medium shrink-0"
                           />
                           {isLaborSuggestionOpen && (() => {
                             const filtered = newLaborName
@@ -2487,14 +2495,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                               className="w-full pl-6 pr-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white font-medium"
                             />
                           </div>
-                          <input
-                            type="number"
-                            min="1"
-                            placeholder="Cant."
-                            value={newLaborQty}
-                            onChange={(e) => setNewLaborQty(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="w-16 py-1.5 text-xs text-center bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white font-medium"
-                          />
                           <button
                             type="button"
                             disabled={!newLaborName || newLaborPrice <= 0}
