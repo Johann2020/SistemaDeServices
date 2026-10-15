@@ -61,14 +61,20 @@ async function exchangeGoogleCode(code, redirectUri) {
 // Find or create account from Google profile
 function findOrCreateFromGoogle(profile) {
   let account = findAccountByGoogleId(profile.id);
-  if (account) return account;
+  if (account) {
+    console.log(`[AUTH] Found account by googleId for ${profile.email} → tenant ${account.tenantId}`);
+    return account;
+  }
 
-  // Check if email already exists (maybe registered differently)
   account = findAccountByEmail(profile.email);
-  if (account) return account;
+  if (account) {
+    console.log(`[AUTH] Found account by email for ${profile.email} → tenant ${account.tenantId}`);
+    return account;
+  }
 
   // Create new account + tenant
   const tenantId = `tenant-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+  console.warn(`[AUTH] Creating NEW account for ${profile.email} → tenant ${tenantId}`);
   return createAccount({
     id: `acc-${crypto.randomUUID()}`,
     googleId: profile.id,

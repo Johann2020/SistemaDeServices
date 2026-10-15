@@ -34,6 +34,20 @@ masterDb.exec(`
   CREATE INDEX IF NOT EXISTS idx_login_events_timestamp ON login_events(timestamp);
 `);
 
+// Force WAL checkpoint on startup to persist pending data into the main .db file
+try { masterDb.pragma('wal_checkpoint(TRUNCATE)'); } catch (_) {}
+
+function checkpointMasterDb() {
+  try { masterDb.pragma('wal_checkpoint(TRUNCATE)'); } catch (_) {}
+}
+
+function closeMasterDb() {
+  try {
+    masterDb.pragma('wal_checkpoint(TRUNCATE)');
+    masterDb.close();
+  } catch (_) {}
+}
+
 function findAccountByGoogleId(googleId) {
   return masterDb.prepare('SELECT * FROM accounts WHERE googleId = ?').get(googleId);
 }
@@ -54,4 +68,4 @@ function recordLogin(accountId) {
   masterDb.prepare('INSERT INTO login_events (accountId, timestamp) VALUES (?, ?)').run(accountId, new Date().toISOString());
 }
 
-module.exports = { masterDb, findAccountByGoogleId, findAccountByEmail, createAccount, recordLogin, dataDir };
+module.exports = { masterDb, findAccountByGoogleId, findAccountByEmail, createAccount, recordLogin, dataDir, checkpointMasterDb, closeMasterDb };

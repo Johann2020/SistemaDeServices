@@ -4,8 +4,8 @@ const path = require('path');
 const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const { authMiddleware, generateToken, exchangeGoogleCode, findOrCreateFromGoogle } = require('./auth.cjs');
-const { getTenantDb, insert } = require('./tenantDb.cjs');
-const { findAccountByEmail, recordLogin, masterDb } = require('./masterDb.cjs');
+const { getTenantDb, insert, checkpointAllDbs, closeAllDbs } = require('./tenantDb.cjs');
+const { findAccountByEmail, recordLogin, masterDb, checkpointMasterDb, closeMasterDb } = require('./masterDb.cjs');
 
 const app = express();
 const PORT = process.env.PORT || 3002;
@@ -270,6 +270,36 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
+// Periodic WAL checkpoint every 5 minutes to persist data from WAL to main .db files
+const checkpointInterval = setInterval(() => {
+  checkpointMasterDb();
+  checkpointAllDbs();
+}, 5 * 60 * 1000);
+
+// Graceful shutdown: checkpoint and close all databases before exit
+function gracefulShutdown(signal) {
+  console.log(`${signal} received, checkpointing databases...`);
+  clearInterval(checkpointInterval);
+  checkpointAllDbs();
+  closeAllDbs();
+  closeMasterDb();
+  console.log('Databases closed cleanly.');
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 app.listen(PORT, () => {
   console.log(`CRM Server running on port ${PORT}`);
+  // Startup diagnostic
+  try {
+    const accounts = masterDb.prepare('SELECT id, email, tenantId FROM accounts').all();
+    console.log(`[STARTUP] DATA_DIR=${process.env.DATA_DIR || '(default)'}, master.db has ${accounts.length} accounts`);
+    for (const acc of accounts) {
+      console.log(`[STARTUP]   ${acc.email} → ${acc.tenantId}`);
+    }
+  } catch (err) {
+    console.error('[STARTUP] Failed to read master.db:', err.message);
+  }
 });

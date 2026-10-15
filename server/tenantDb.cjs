@@ -221,6 +221,9 @@ function getTenantDb(tenantId) {
     }
   }
 
+  // Force WAL checkpoint to persist data into the main .db file
+  try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch (_) {}
+
   dbCache.set(tenantId, db);
   return db;
 }
@@ -283,4 +286,20 @@ function remove(db, table, id) {
   return db.prepare(`DELETE FROM ${table} WHERE id = ?`).run(id);
 }
 
-module.exports = { getTenantDb, getAll, getById, insert, update, remove };
+function checkpointAllDbs() {
+  for (const [, db] of dbCache) {
+    try { db.pragma('wal_checkpoint(TRUNCATE)'); } catch (_) {}
+  }
+}
+
+function closeAllDbs() {
+  for (const [tenantId, db] of dbCache) {
+    try {
+      db.pragma('wal_checkpoint(TRUNCATE)');
+      db.close();
+    } catch (_) {}
+    dbCache.delete(tenantId);
+  }
+}
+
+module.exports = { getTenantDb, getAll, getById, insert, update, remove, checkpointAllDbs, closeAllDbs };
