@@ -1715,39 +1715,36 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         >
           <div className="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[95vh] md:max-h-[90vh] animate-slide-up">
             {/* Unified Top Header Bar */}
-            <div className="bg-slate-900 text-white p-4.5 px-5 flex justify-between items-center shrink-0 border-b border-slate-800">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="text-[10px] font-bold bg-indigo-600 text-white px-2.5 py-1 rounded-md tracking-wider uppercase">
-                  Ficha de Diagnóstico
-                </span>
-                <h3 className="text-lg font-bold font-mono tracking-tight">
-                  {selectedOrderForModal.id}
-                </h3>
-                <select
-                  value={selectedOrderForModal.priority}
-                  onChange={(e) => {
-                    const newPrio = e.target.value as any;
-                    updateOrderDetails(selectedOrderForModal.id, {
-                      priority: newPrio,
-                    });
-                    setSelectedOrderForModal((prev) =>
-                      prev ? { ...prev, priority: newPrio } : null,
-                    );
-                  }}
-                  className={`px-2.5 py-0.5 rounded text-[11px] font-bold appearance-none cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500 ${getPriorityStyle(selectedOrderForModal.priority)}`}
-                  title="Cambiar prioridad"
-                >
-                  <option value="Baja">Prioridad Baja</option>
-                  <option value="Media">Prioridad Media</option>
-                  <option value="Alta">Prioridad Alta</option>
-                  <option value="Crítica">Prioridad Crítica</option>
-                </select>
-                <span className="text-slate-400 text-xs font-medium">
-                  | {selectedOrderForModal.deviceType}{" "}
-                  {selectedOrderForModal.brand} {selectedOrderForModal.model}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
+            <div className="bg-slate-900 text-white p-4.5 px-5 shrink-0 border-b border-slate-800">
+              <div className="flex justify-between items-center">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="text-[10px] font-bold bg-indigo-600 text-white px-2.5 py-1 rounded-md tracking-wider uppercase">
+                    Ficha de Diagnóstico
+                  </span>
+                  <h3 className="text-lg font-bold font-mono tracking-tight">
+                    {selectedOrderForModal.id}
+                  </h3>
+                  <select
+                    value={selectedOrderForModal.priority}
+                    onChange={(e) => {
+                      const newPrio = e.target.value as any;
+                      updateOrderDetails(selectedOrderForModal.id, {
+                        priority: newPrio,
+                      });
+                      setSelectedOrderForModal((prev) =>
+                        prev ? { ...prev, priority: newPrio } : null,
+                      );
+                    }}
+                    className={`px-2.5 py-0.5 rounded text-[11px] font-bold appearance-none cursor-pointer outline-none focus:ring-2 focus:ring-indigo-500 ${getPriorityStyle(selectedOrderForModal.priority)}`}
+                    title="Cambiar prioridad"
+                  >
+                    <option value="Baja">Prioridad Baja</option>
+                    <option value="Media">Prioridad Media</option>
+                    <option value="Alta">Prioridad Alta</option>
+                    <option value="Crítica">Prioridad Crítica</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
                 {/* Print Receipt Button */}
                 <button
                   type="button"
@@ -1793,7 +1790,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 >
                   <X className="h-4.5 w-4.5" />
                 </button>
+                </div>
               </div>
+              <p className="text-slate-400 text-xs font-medium mt-1.5 pl-0.5">
+                {selectedOrderForModal.deviceType} {selectedOrderForModal.brand} {selectedOrderForModal.model}
+              </p>
             </div>
 
             {/* Tab Navigation */}
@@ -2429,7 +2430,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       )}
 
                       {/* Add new labor item */}
-                      <div className="bg-white border border-indigo-100 rounded-lg p-2.5 space-y-2" ref={laborInputRef}>
+                      <div className="space-y-2" ref={laborInputRef}>
                         <div className="relative flex items-end gap-2">
                           <div className="flex-1 min-w-0">
                             <input
