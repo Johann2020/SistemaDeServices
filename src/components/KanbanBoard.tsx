@@ -2430,23 +2430,27 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
                       {/* Add new labor item */}
                       <div className="bg-white border border-indigo-100 rounded-lg p-2.5 space-y-2" ref={laborInputRef}>
-                        <div className="relative flex items-center gap-2">
-                          <input
-                            type="text"
-                            placeholder="Ej. Reinstalación Windows, Limpieza..."
-                            value={newLaborName}
-                            onFocus={() => { if (laborSuggestions.length > 0) setIsLaborSuggestionOpen(true); }}
-                            onChange={(e) => { setNewLaborName(e.target.value); setIsLaborSuggestionOpen(true); }}
-                            className="flex-1 min-w-0 text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white"
-                          />
-                          <input
-                            type="number"
-                            min="1"
-                            title="Cantidad"
-                            value={newLaborQty}
-                            onChange={(e) => setNewLaborQty(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="w-14 py-2 text-xs text-center bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white font-medium shrink-0"
-                          />
+                        <div className="relative flex items-end gap-2">
+                          <div className="flex-1 min-w-0">
+                            <input
+                              type="text"
+                              placeholder="Ej. Reinstalación Windows, Limpieza..."
+                              value={newLaborName}
+                              onFocus={() => { if (laborSuggestions.length > 0) setIsLaborSuggestionOpen(true); }}
+                              onChange={(e) => { setNewLaborName(e.target.value); setIsLaborSuggestionOpen(true); }}
+                              className="w-full text-xs p-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white"
+                            />
+                          </div>
+                          <div className="shrink-0">
+                            <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Cantidad</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={newLaborQty}
+                              onChange={(e) => setNewLaborQty(Math.max(1, parseInt(e.target.value) || 1))}
+                              className="w-16 py-2 text-xs text-center bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-400 focus:bg-white font-medium"
+                            />
+                          </div>
                           {isLaborSuggestionOpen && (() => {
                             const filtered = newLaborName
                               ? laborSuggestions.filter(s => s.name.toLowerCase().includes(newLaborName.toLowerCase()))
@@ -3076,23 +3080,25 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                         )}
 
                         {selectedPartId && (
-                          <div className="flex items-center space-x-1.5">
-                            <input
-                              type="number"
-                              min={1}
-                              max={
-                                inventory.find((i) => i.id === selectedPartId)
-                                  ?.stock || 1
-                              }
-                              value={partQuantity}
-                              onChange={(e) =>
-                                setPartQuantity(
-                                  Math.max(1, parseInt(e.target.value) || 1),
-                                )
-                              }
-                              className="w-16 text-xs p-2 border border-slate-200 bg-white rounded-lg text-center font-bold"
-                              title="Cantidad"
-                            />
+                          <div className="flex items-end space-x-1.5">
+                            <div className="shrink-0">
+                              <label className="text-[10px] font-semibold text-slate-400 block mb-0.5">Cantidad</label>
+                              <input
+                                type="number"
+                                min={1}
+                                max={
+                                  inventory.find((i) => i.id === selectedPartId)
+                                    ?.stock || 1
+                                }
+                                value={partQuantity}
+                                onChange={(e) =>
+                                  setPartQuantity(
+                                    Math.max(1, parseInt(e.target.value) || 1),
+                                  )
+                                }
+                                className="w-20 text-xs p-2 border border-slate-200 bg-white rounded-lg text-center font-bold"
+                              />
+                            </div>
                             <button
                               onClick={handleAddPart}
                               className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2 px-3 rounded-lg flex items-center justify-center space-x-1 transition cursor-pointer"
