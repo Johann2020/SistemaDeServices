@@ -401,7 +401,7 @@ export const OrderForm: React.FC<OrderFormProps> = ({ setActiveTab, onClose, onC
           </div>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+        <form onSubmit={handleSubmit} className="bg-white border border-slate-200 rounded-2xl shadow-xs">
           {/* Step tabs */}
           <div className="flex border-b border-slate-200 bg-slate-50/60">
             {steps.map((step, idx) => {
