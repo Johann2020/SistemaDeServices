@@ -280,6 +280,14 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       api.settings.set('activeDeviceTypes', JSON.stringify(updated)).catch(console.error);
       return updated;
     });
+    setOrders(prev => prev.map(o => {
+      if (o.deviceType === oldName) {
+        const updated = { ...o, deviceType: trimmed };
+        api.orders.update(o.id, { deviceType: trimmed }).catch(console.error);
+        return updated;
+      }
+      return o;
+    }));
   };
 
   const setActiveDeviceTypes = (types: string[]) => {
