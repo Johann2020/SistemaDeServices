@@ -1483,20 +1483,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                                    setRoutePopoverPos({ x: rect.left, y: rect.bottom + 6 });
-                                    setRoutePopoverOrderId(routePopoverOrderId === order.id ? null : order.id);
-                                    setPriorityDropdownOrderId(null);
-                                    setPaymentDropdownOrderId(null);
-                                  }}
-                                  className="text-slate-300 hover:text-blue-500 hover:bg-blue-50 p-1 rounded transition"
-                                  title="Ruta de servicio"
-                                >
-                                  <Info className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
                                     openOrderDetails(order);
                                   }}
                                   className="text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 p-1 rounded transition"
@@ -1513,6 +1499,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                   title="Eliminar ticket"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    setRoutePopoverPos({ x: rect.left, y: rect.bottom + 6 });
+                                    setRoutePopoverOrderId(routePopoverOrderId === order.id ? null : order.id);
+                                    setPriorityDropdownOrderId(null);
+                                    setPaymentDropdownOrderId(null);
+                                  }}
+                                  className="text-slate-300 hover:text-blue-500 hover:bg-blue-50 p-1 rounded transition"
+                                  title="Ruta de servicio"
+                                >
+                                  <Info className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                             </div>
