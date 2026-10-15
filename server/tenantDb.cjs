@@ -168,11 +168,8 @@ const SCHEMA_SQL = `
 
   CREATE INDEX IF NOT EXISTS idx_orders_clientId ON orders(clientId);
   CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
-  CREATE INDEX IF NOT EXISTS idx_orders_technicianId ON orders(technicianId);
-  CREATE INDEX IF NOT EXISTS idx_orders_deviceTypeId ON orders(deviceTypeId);
   CREATE INDEX IF NOT EXISTS idx_order_status_history_orderId ON order_status_history(orderId);
   CREATE INDEX IF NOT EXISTS idx_budgets_clientId ON budgets(clientId);
-  CREATE INDEX IF NOT EXISTS idx_budgets_deviceTypeId ON budgets(deviceTypeId);
 `;
 
 const dbCache = new Map();
@@ -233,6 +230,10 @@ function getTenantDb(tenantId) {
   if (!budgetCols.includes('deviceTypeId')) {
     db.exec("ALTER TABLE budgets ADD COLUMN deviceTypeId TEXT DEFAULT ''");
   }
+
+  db.exec("CREATE INDEX IF NOT EXISTS idx_orders_technicianId ON orders(technicianId)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_orders_deviceTypeId ON orders(deviceTypeId)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_budgets_deviceTypeId ON budgets(deviceTypeId)");
 
   const laborCols = db.prepare("PRAGMA table_info(order_labor_items)").all().map(c => c.name);
   if (!laborCols.includes('quantity')) {
