@@ -54,6 +54,7 @@ import {
   FolderOpen,
   PlusCircle,
   Settings,
+  Info,
 } from "lucide-react";
 
 
@@ -163,6 +164,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [dropdownPos, setDropdownPos] = useState<{ x: number; y: number; above: boolean }>({ x: 0, y: 0, above: false });
   const [partialAmountInput, setPartialAmountInput] = useState<string>("");
   const [showPartialInput, setShowPartialInput] = useState(false);
+  const [routePopoverOrderId, setRoutePopoverOrderId] = useState<string | null>(null);
+  const [routePopoverPos, setRoutePopoverPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
   // New floating service intake modal
   const [isNewServiceModalOpen, setIsNewServiceModalOpen] = useState(false);
@@ -178,11 +181,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   }, [openNewOrderModal, setOpenNewOrderModal]);
 
   useEffect(() => {
-    if (!paymentDropdownOrderId && !priorityDropdownOrderId) return;
-    const handler = () => { setPaymentDropdownOrderId(null); setPriorityDropdownOrderId(null); };
+    if (!paymentDropdownOrderId && !priorityDropdownOrderId && !routePopoverOrderId) return;
+    const handler = () => { setPaymentDropdownOrderId(null); setPriorityDropdownOrderId(null); setRoutePopoverOrderId(null); };
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
-  }, [paymentDropdownOrderId, priorityDropdownOrderId]);
+  }, [paymentDropdownOrderId, priorityDropdownOrderId, routePopoverOrderId]);
 
   // Delay Config panel states
   const [showDelayConfigPanel, setShowDelayConfigPanel] = useState(false);
@@ -1480,6 +1483,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    setRoutePopoverPos({ x: rect.left, y: rect.bottom + 6 });
+                                    setRoutePopoverOrderId(routePopoverOrderId === order.id ? null : order.id);
+                                    setPriorityDropdownOrderId(null);
+                                    setPaymentDropdownOrderId(null);
+                                  }}
+                                  className="text-slate-300 hover:text-blue-500 hover:bg-blue-50 p-1 rounded transition"
+                                  title="Ruta de servicio"
+                                >
+                                  <Info className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
                                     openOrderDetails(order);
                                   }}
                                   className="text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 p-1 rounded transition"
@@ -2485,237 +2502,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   </div>
                 </div>
 
-                {/* Service Route Map / Timeline */}
-                {(() => {
-                  const getStatusTimestamp = (status: OrderStatus) => {
-                    const entry = selectedOrderForModal.statusHistory?.find(
-                      (h) => h.status === status,
-                    );
-                    return entry ? entry.timestamp : null;
-                  };
-
-                  const calculateElapsedTime = (
-                    startStr: string,
-                    endStr: string,
-                  ): string => {
-                    const start = new Date(startStr);
-                    const end = new Date(endStr);
-                    const diffMs = end.getTime() - start.getTime();
-                    if (diffMs < 0) return "0m";
-
-                    const diffMins = Math.floor(diffMs / 60000);
-                    if (diffMins < 60) {
-                      return `${diffMins} min`;
-                    }
-
-                    const diffHours = Math.floor(diffMins / 60);
-                    const remainingMins = diffMins % 60;
-                    if (diffHours < 24) {
-                      return `${diffHours}h ${remainingMins}m`;
-                    }
-
-                    const diffDays = Math.floor(diffHours / 24);
-                    const remainingHours = diffHours % 24;
-                    return `${diffDays}d ${remainingHours}h`;
-                  };
-
-                  const tIngresado =
-                    getStatusTimestamp("Ingresado") ||
-                    selectedOrderForModal.createdAt;
-                  const tEnReparacion = getStatusTimestamp("En Reparación");
-                  const tListo = getStatusTimestamp("Listo");
-                  const tEntregado = getStatusTimestamp("Entregado");
-
-                  const steps = [
-                    {
-                      status: "Ingresado" as OrderStatus,
-                      label: "Ingresado",
-                      time: tIngresado,
-                    },
-                    {
-                      status: "En Reparación" as OrderStatus,
-                      label: "En Reparación",
-                      time: tEnReparacion,
-                    },
-                    {
-                      status: "Listo" as OrderStatus,
-                      label: "Listo",
-                      time: tListo,
-                    },
-                    {
-                      status: "Entregado" as OrderStatus,
-                      label: "Entregado",
-                      time: tEntregado,
-                    },
-                  ];
-
-                  const currentStatus = selectedOrderForModal.status;
-
-                  return (
-                    <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mt-5 space-y-4 animate-fade-in shadow-xs">
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-                        <div className="flex items-center space-x-1.5">
-                          <Clock className="h-4 w-4 text-indigo-600" />
-                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                            Ruta de Servicio y Tiempos
-                          </h4>
-                        </div>
-                        <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold font-mono">
-                          Total:{" "}
-                          {calculateElapsedTime(
-                            tIngresado,
-                            tEntregado || new Date().toISOString(),
-                          )}
-                        </span>
-                      </div>
-
-                      {/* Stepper Grid */}
-                      <div className="grid grid-cols-4 gap-1 text-center relative py-2 select-none">
-                        {/* background track line */}
-                        <div className="absolute top-6 left-[12.5%] right-[12.5%] h-0.5 bg-slate-200 -z-1" />
-                        {/* colored active line */}
-                        <div
-                          className="absolute top-6 left-[12.5%] h-0.5 bg-indigo-600 transition-all duration-500 -z-1"
-                          style={{
-                            width: tEntregado
-                              ? "75%"
-                              : tListo
-                                ? "50%"
-                                : tEnReparacion
-                                  ? "25%"
-                                  : "0%",
-                          }}
-                        />
-
-                        {steps.map((step, idx) => {
-                          const isCompleted = step.time !== null;
-                          const isActive = currentStatus === step.status;
-
-                          return (
-                            <div
-                              key={idx}
-                              className="flex flex-col items-center relative z-10"
-                            >
-                              <div
-                                className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 transition-all ${
-                                  isCompleted
-                                    ? "bg-indigo-600 border-indigo-600 text-white shadow-sm"
-                                    : isActive
-                                      ? "bg-indigo-50 border-indigo-600 text-indigo-600 ring-4 ring-indigo-100 animate-pulse"
-                                      : "bg-white border-slate-300 text-slate-400"
-                                }`}
-                              >
-                                {isCompleted ? (
-                                  <CheckCircle2 className="h-4 w-4" />
-                                ) : (
-                                  idx + 1
-                                )}
-                              </div>
-                              <span
-                                className={`text-[10px] font-bold mt-2 truncate max-w-full ${isActive ? "text-indigo-600" : isCompleted ? "text-slate-800" : "text-slate-400"}`}
-                              >
-                                {step.label}
-                              </span>
-                              {step.time ? (
-                                <span className="text-[8.5px] text-slate-500 font-semibold font-mono mt-0.5 leading-tight block">
-                                  {new Date(step.time).toLocaleDateString(
-                                    "es-AR",
-                                    { day: "2-digit", month: "short" },
-                                  )}
-                                  <br />
-                                  {new Date(step.time).toLocaleTimeString(
-                                    "es-AR",
-                                    { hour: "2-digit", minute: "2-digit" },
-                                  )}
-                                </span>
-                              ) : (
-                                <span className="text-[8.5px] text-slate-300 italic mt-0.5 block">
-                                  Pendiente
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Stage durations list */}
-                      <div className="bg-white border border-slate-200 rounded-lg p-3 space-y-2 text-xs">
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                          Duración de Fase
-                        </div>
-
-                        <div className="flex items-center justify-between py-0.5 leading-none">
-                          <span className="text-slate-500 flex items-center">
-                            <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 mr-2" />
-                            Ingresado → En Reparación:
-                          </span>
-                          {tEnReparacion ? (
-                            <span className="font-bold text-slate-700 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                              {calculateElapsedTime(tIngresado, tEnReparacion)}
-                            </span>
-                          ) : currentStatus === "Ingresado" ? (
-                            <span className="font-bold text-amber-600 font-mono bg-amber-50 px-1.5 py-0.5 rounded animate-pulse">
-                              En curso (
-                              {calculateElapsedTime(
-                                tIngresado,
-                                new Date().toISOString(),
-                              )}
-                              )
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 italic">N/A</span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center justify-between py-0.5 leading-none">
-                          <span className="text-slate-500 flex items-center">
-                            <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-2" />
-                            En Reparación → Listo:
-                          </span>
-                          {tEnReparacion && tListo ? (
-                            <span className="font-bold text-slate-700 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                              {calculateElapsedTime(tEnReparacion, tListo)}
-                            </span>
-                          ) : currentStatus === "En Reparación" ? (
-                            <span className="font-bold text-amber-600 font-mono bg-amber-50 px-1.5 py-0.5 rounded animate-pulse">
-                              En curso (
-                              {calculateElapsedTime(
-                                tEnReparacion,
-                                new Date().toISOString(),
-                              )}
-                              )
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 italic">N/A</span>
-                          )}
-                        </div>
-
-                        <div className="flex items-center justify-between py-0.5 leading-none">
-                          <span className="text-slate-500 flex items-center">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2" />
-                            Listo → Entregado:
-                          </span>
-                          {tListo && tEntregado ? (
-                            <span className="font-bold text-slate-700 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                              {calculateElapsedTime(tListo, tEntregado)}
-                            </span>
-                          ) : currentStatus === "Listo" ? (
-                            <span className="font-bold text-amber-600 font-mono bg-amber-50 px-1.5 py-0.5 rounded animate-pulse">
-                              En curso (
-                              {calculateElapsedTime(
-                                tListo,
-                                new Date().toISOString(),
-                              )}
-                              )
-                            </span>
-                          ) : (
-                            <span className="text-slate-300 italic">N/A</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
               </div>
               )}
 
@@ -4242,6 +4028,74 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 </div>
               </div>
             )}
+          </div>,
+          document.body
+        );
+      })()}
+      {routePopoverOrderId && (() => {
+        const routeOrder = orders.find(o => o.id === routePopoverOrderId);
+        if (!routeOrder) return null;
+
+        const getTs = (s: OrderStatus) => routeOrder.statusHistory?.find(h => h.status === s)?.timestamp || null;
+        const elapsed = (a: string, b: string) => {
+          const ms = new Date(b).getTime() - new Date(a).getTime();
+          if (ms < 0) return '0m';
+          const mins = Math.floor(ms / 60000);
+          if (mins < 60) return `${mins} min`;
+          const hrs = Math.floor(mins / 60);
+          if (hrs < 24) return `${hrs}h ${mins % 60}m`;
+          return `${Math.floor(hrs / 24)}d ${hrs % 24}h`;
+        };
+
+        const tIng = getTs('Ingresado') || routeOrder.createdAt;
+        const tRep = getTs('En Reparación');
+        const tLis = getTs('Listo');
+        const tEnt = getTs('Entregado');
+        const cur = routeOrder.status;
+        const now = new Date().toISOString();
+
+        const phases: { label: string; color: string; from: string | null; to: string | null; activeStatus: string }[] = [
+          { label: 'Ingresado → En Reparación', color: 'bg-zinc-400', from: tIng, to: tRep, activeStatus: 'Ingresado' },
+          { label: 'En Reparación → Listo', color: 'bg-blue-500', from: tRep, to: tLis, activeStatus: 'En Reparación' },
+          { label: 'Listo → Entregado', color: 'bg-emerald-500', from: tLis, to: tEnt, activeStatus: 'Listo' },
+        ];
+
+        return createPortal(
+          <div
+            className="fixed z-[9999] bg-white border border-slate-200 rounded-xl shadow-xl p-4 w-72 animate-scale-up"
+            style={{ left: Math.min(routePopoverPos.x, window.innerWidth - 300), top: Math.min(routePopoverPos.y, window.innerHeight - 250) }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-indigo-600" />
+                <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Ruta de Servicio</span>
+              </div>
+              <span className="text-[10px] bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded font-bold font-mono">
+                {elapsed(tIng, tEnt || now)}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {phases.map((p, i) => (
+                <div key={i} className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-500 flex items-center">
+                    <span className={`w-1.5 h-1.5 rounded-full ${p.color} mr-1.5 shrink-0`} />
+                    {p.label}
+                  </span>
+                  {p.from && p.to ? (
+                    <span className="font-bold text-slate-700 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
+                      {elapsed(p.from, p.to)}
+                    </span>
+                  ) : cur === p.activeStatus && p.from ? (
+                    <span className="font-bold text-amber-600 font-mono bg-amber-50 px-1.5 py-0.5 rounded">
+                      {elapsed(p.from, now)}
+                    </span>
+                  ) : (
+                    <span className="text-slate-300 italic">N/A</span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>,
           document.body
         );

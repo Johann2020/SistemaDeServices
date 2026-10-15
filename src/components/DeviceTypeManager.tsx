@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useCRM } from '../context/CRMContext';
-import { Settings, Plus, X, Check } from 'lucide-react';
+import { Settings, Plus, X, Check, Pencil } from 'lucide-react';
 
 interface DeviceTypeManagerProps {
   isOpen: boolean;
@@ -8,9 +8,11 @@ interface DeviceTypeManagerProps {
 }
 
 export const DeviceTypeManager: React.FC<DeviceTypeManagerProps> = ({ isOpen, onClose }) => {
-  const { allDeviceTypes, activeDeviceTypes, addDeviceType, setActiveDeviceTypes, showToast } = useCRM();
+  const { allDeviceTypes, activeDeviceTypes, addDeviceType, renameDeviceType, setActiveDeviceTypes, showToast } = useCRM();
   const [activeTab, setActiveTab] = useState<'add' | 'manage'>('add');
   const [newTypeName, setNewTypeName] = useState('');
+  const [editingType, setEditingType] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
 
   const validation = useMemo(() => {
     const trimmed = newTypeName.trim();
@@ -125,31 +127,86 @@ export const DeviceTypeManager: React.FC<DeviceTypeManagerProps> = ({ isOpen, on
             <div className="space-y-1">
               {allDeviceTypes.map(type => {
                 const isActive = activeDeviceTypes.includes(type);
+                const isEditing = editingType === type;
                 return (
                   <div
                     key={type}
                     className="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-slate-50 transition"
                   >
-                    <span className={`text-xs font-medium ${isActive ? 'text-slate-800' : 'text-slate-400'}`}>
-                      {type}
-                    </span>
-                    <button
-                      onClick={() => handleToggle(type)}
-                      className={`relative w-9 h-5 rounded-full transition-colors ${
-                        isActive ? 'bg-indigo-600' : 'bg-slate-300'
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                          isActive ? 'translate-x-4' : 'translate-x-0'
-                        }`}
-                      />
-                    </button>
+                    {isEditing ? (
+                      <div className="flex items-center gap-1.5 flex-1 mr-2">
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={e => setEditName(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              const trimmed = editName.trim();
+                              if (trimmed && trimmed !== type) {
+                                const exists = allDeviceTypes.some(t => t !== type && t.toLowerCase() === trimmed.toLowerCase());
+                                if (exists) { showToast('Ya existe una categoría con ese nombre', 'error'); return; }
+                                renameDeviceType(type, trimmed);
+                                showToast(`Categoría renombrada a "${trimmed}"`, 'success');
+                              }
+                              setEditingType(null);
+                            }
+                            if (e.key === 'Escape') setEditingType(null);
+                          }}
+                          autoFocus
+                          className="flex-1 text-xs p-1.5 bg-white border border-indigo-300 rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-indigo-100"
+                        />
+                        <button
+                          onClick={() => {
+                            const trimmed = editName.trim();
+                            if (trimmed && trimmed !== type) {
+                              const exists = allDeviceTypes.some(t => t !== type && t.toLowerCase() === trimmed.toLowerCase());
+                              if (exists) { showToast('Ya existe una categoría con ese nombre', 'error'); return; }
+                              renameDeviceType(type, trimmed);
+                              showToast(`Categoría renombrada a "${trimmed}"`, 'success');
+                            }
+                            setEditingType(null);
+                          }}
+                          className="p-1 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                        >
+                          <Check className="h-3 w-3" />
+                        </button>
+                        <button onClick={() => setEditingType(null)} className="p-1 bg-slate-200 text-slate-600 rounded-lg hover:bg-slate-300 transition">
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className={`text-xs font-medium truncate ${isActive ? 'text-slate-800' : 'text-slate-400'}`}>
+                            {type}
+                          </span>
+                          <button
+                            onClick={() => { setEditingType(type); setEditName(type); }}
+                            className="p-0.5 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded transition"
+                            title="Editar nombre"
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </div>
+                        <button
+                          onClick={() => handleToggle(type)}
+                          className={`relative w-9 h-5 rounded-full transition-colors shrink-0 ${
+                            isActive ? 'bg-indigo-600' : 'bg-slate-300'
+                          }`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                              isActive ? 'translate-x-4' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </>
+                    )}
                   </div>
                 );
               })}
               <p className="text-[10px] text-slate-400 italic mt-3 px-3">
-                Los servicios existentes no se veran afectados al desactivar una categoria.
+                Los servicios existentes no se veran afectados al desactivar o renombrar una categoria.
               </p>
             </div>
           )}

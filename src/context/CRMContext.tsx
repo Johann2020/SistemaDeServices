@@ -99,6 +99,7 @@ interface CRMContextType {
   allDeviceTypes: string[];
   activeDeviceTypes: string[];
   addDeviceType: (name: string) => void;
+  renameDeviceType: (oldName: string, newName: string) => void;
   setActiveDeviceTypes: (types: string[]) => void;
   laborItemTemplates: Array<{ name: string; price: number }>;
   setLaborItemTemplates: (items: Array<{ name: string; price: number }>) => void;
@@ -261,6 +262,21 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setActiveDeviceTypesState(prev => {
       if (prev.includes(name)) return prev;
       const updated = [...prev, name];
+      api.settings.set('activeDeviceTypes', JSON.stringify(updated)).catch(console.error);
+      return updated;
+    });
+  };
+
+  const renameDeviceType = (oldName: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed || trimmed === oldName) return;
+    setAllDeviceTypes(prev => {
+      const updated = prev.map(t => t === oldName ? trimmed : t);
+      api.settings.set('allDeviceTypes', JSON.stringify(updated)).catch(console.error);
+      return updated;
+    });
+    setActiveDeviceTypesState(prev => {
+      const updated = prev.map(t => t === oldName ? trimmed : t);
       api.settings.set('activeDeviceTypes', JSON.stringify(updated)).catch(console.error);
       return updated;
     });
@@ -1520,6 +1536,7 @@ export const CRMProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         allDeviceTypes,
         activeDeviceTypes,
         addDeviceType,
+        renameDeviceType,
         setActiveDeviceTypes,
         laborItemTemplates,
         setLaborItemTemplates
